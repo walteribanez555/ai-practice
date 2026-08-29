@@ -28,10 +28,9 @@
     "hono": "^4.6.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.1053.0",
-    "@aws-sdk/client-s3": "^3.1053.0",
+    "@aws-sdk/client-dynamodb": "^3.1053.0",
+    "@aws-sdk/lib-dynamodb": "^3.1053.0",
     "@aws-sdk/client-secrets-manager": "^3.0.0",
-    "@aws-sdk/s3-request-presigner": "^3.1053.0",
     "@eslint/js": "^10.0.1",
     "@types/aws-lambda": "^8.10.161",
     "@types/jest": "^30.0.0",

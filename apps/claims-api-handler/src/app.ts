@@ -5,6 +5,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { config, createLogger } from './config';
+import { claimRouter } from './modules/claim/claim.module';
 
 const logger = createLogger('App');
 const { origins, methods, headers } = config.getValue('cors');
@@ -39,8 +40,6 @@ v1.get('/health', (c) => {
   return c.json({ status: 'ok' });
 });
 
-// ── Feature modules ───────────────────────────────────────────────────────────
-// Modules will be mounted here as they are created:
-//   v1.route('/example', exampleRoute);
+v1.route('/claims', claimRouter);
 
 app.route('/api/v1', v1);
