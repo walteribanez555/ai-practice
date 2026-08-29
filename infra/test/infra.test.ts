@@ -35,4 +35,35 @@ describe("AssistanceStack", () => {
     });
     expect(stack.appEnv).toBe("prod");
   });
+
+  it("creates the claims DynamoDB table", () => {
+    const app = new cdk.App();
+    const stack = new AssistanceStack(app, "TestDynamoStack", {
+      env: ENV,
+      appEnv: "prod",
+    });
+    const template = Template.fromStack(stack);
+
+    template.hasResourceProperties("AWS::DynamoDB::Table", {
+      TableName: "assistance-prod-claims",
+      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+    });
+  });
+
+  it("creates GSIs for clientId, status and prioridad", () => {
+    const app = new cdk.App();
+    const stack = new AssistanceStack(app, "TestGsiStack", {
+      env: ENV,
+      appEnv: "prod",
+    });
+    const template = Template.fromStack(stack);
+
+    template.hasResourceProperties("AWS::DynamoDB::Table", {
+      GlobalSecondaryIndexes: [
+        { IndexName: "clientId-createdAt-index" },
+        { IndexName: "status-createdAt-index" },
+        { IndexName: "prioridad-createdAt-index" },
+      ],
+    });
+  });
 });
