@@ -1,16 +1,14 @@
-/**
- * Hono app — shared between Lambda (index.ts) and local server (main.ts).
- */
-
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { config, createLogger } from './config';
 import { claimRouter } from './modules/claim/claim.module';
+import { authRouter } from './modules/auth/auth.module';
+import type { AppEnv } from './app.types';
 
 const logger = createLogger('App');
 const { origins, methods, headers } = config.getValue('cors');
 
-export const app = new Hono();
+export const app = new Hono<AppEnv>();
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 
@@ -33,13 +31,14 @@ app.get('/', (c) => {
   return c.json({ service: 'claims-api-handler', status: 'ok' });
 });
 
-const v1 = new Hono();
+const v1 = new Hono<AppEnv>();
 
 v1.get('/health', (c) => {
   logger.info('Health check');
   return c.json({ status: 'ok' });
 });
 
-v1.route('/claims', claimRouter);
+v1.route('/auth',   authRouter);   // public  — no auth required
+v1.route('/claims', claimRouter);  // protected — auth applied per-route
 
 app.route('/api/v1', v1);

@@ -1,12 +1,20 @@
 import { Hono } from 'hono';
+import type { AppEnv } from '../../app.types';
+import { authMiddleware, requireRole } from '../auth/auth.middleware';
 import { ClaimController } from './claim.controller';
 
-export const claimRouter = new Hono();
+export const claimRouter = new Hono<AppEnv>();
 
-claimRouter.get('/',                     ClaimController.findAll);
-claimRouter.get('/client/:clientId',     ClaimController.findByClient);
-claimRouter.get('/:id',                  ClaimController.findById);
-claimRouter.post('/',                    ClaimController.create);
-claimRouter.post('/:id/process',         ClaimController.process);
-claimRouter.patch('/:id',               ClaimController.update);
-claimRouter.delete('/:id',              ClaimController.delete);
+// All claim routes require a valid JWT
+claimRouter.use('*', authMiddleware);
+
+// ── Adjuster-only routes ───────────────────────────────────────────────────────
+claimRouter.get('/',            requireRole('adjuster'), ClaimController.findAll);
+claimRouter.post('/:id/process', requireRole('adjuster'), ClaimController.process);
+claimRouter.patch('/:id',        requireRole('adjuster'), ClaimController.update);
+claimRouter.delete('/:id',       requireRole('adjuster'), ClaimController.delete);
+
+// ── Shared routes (client sees own data, adjuster sees all) ───────────────────
+claimRouter.get('/client/:clientId', ClaimController.findByClient);
+claimRouter.get('/:id',              ClaimController.findById);
+claimRouter.post('/',                ClaimController.create);
