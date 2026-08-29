@@ -8,7 +8,10 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "gsi:list":   "ts-node scripts/manage-gsi.ts list",
+    "gsi:add":    "ts-node scripts/manage-gsi.ts add",
+    "gsi:remove": "ts-node scripts/manage-gsi.ts remove"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
