@@ -7,7 +7,7 @@ const baseConfig = {
   bundle: true,
   minify: isProduction,
   sourcemap: !isProduction,
-  target: 'node22',
+  target: 'node24',
   platform: 'node',
   external: ['aws-sdk', '@aws-sdk'],
   define: {
