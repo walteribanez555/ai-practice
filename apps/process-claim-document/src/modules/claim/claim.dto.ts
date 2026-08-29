@@ -1,5 +1,5 @@
 import type { Claim } from '../../orm/entities/claim.entity';
-import type { ClaimStatus, Coverage, ExtractedData, Priority } from './claim.types';
+import type { ClaimStatus, Coverage, Priority } from './claim.types';
 
 // ── Input DTOs ────────────────────────────────────────────────────────────────
 
@@ -9,15 +9,6 @@ export interface CreateClaimDto {
   documentKey: string;
   contentType: string;
   fileSizeBytes: number;
-}
-
-export interface ProcessClaimDto {
-  extracted: ExtractedData;
-  documentSignals?: {
-    lowQualityDocument?: boolean;
-    possibleAlteration?: boolean;
-    inconsistentParties?: boolean;
-  };
 }
 
 export interface UpdateClaimDto {

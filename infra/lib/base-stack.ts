@@ -192,6 +192,20 @@ export class AssistanceStack extends cdk.Stack {
     processClaimRole.addToPolicy(dynamoPolicy);
     appSecret.grantRead(processClaimRole);
 
+    // Bedrock: allow invoking any foundation model and cross-region inference profile.
+    // ConverseCommand maps to bedrock:InvokeModel at the IAM level.
+    processClaimRole.addToPolicy(new iam.PolicyStatement({
+      sid:     "AllowBedrockInvoke",
+      actions: ["bedrock:InvokeModel"],
+      resources: [
+        `arn:aws:bedrock:${this.region}::foundation-model/*`,
+        `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
+      ],
+    }));
+
+    // S3: allow reading claim documents to send them to Bedrock for analysis.
+    documentsBucket.grantRead(processClaimRole);
+
     const processClaimLogGroup = new logs.LogGroup(this, "ProcessClaimLogGroup", {
       logGroupName:  `/aws/lambda/${serviceName}-process-claim-document`,
       retention:     logs.RetentionDays.ONE_WEEK,
@@ -205,9 +219,13 @@ export class AssistanceStack extends cdk.Stack {
       entry:        path.join(__dirname, "../../apps/process-claim-document/src/index.ts"),
       handler:      "handler",
       role:         processClaimRole,
-      timeout:      cdk.Duration.seconds(30),
+      timeout:      cdk.Duration.seconds(60), // Bedrock + S3 download can take longer
       memorySize:   512,
-      environment:  sharedEnv,
+      environment: {
+        ...sharedEnv,
+        // Override via env var to switch models without a redeploy
+        BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID ?? "us.amazon.nova-pro-v1:0",
+      },
       logGroup:     processClaimLogGroup,
       bundling:     sharedBundling,
     });

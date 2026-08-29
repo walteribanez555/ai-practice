@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { ClaimService } from './claim.service';
-import type { CreateClaimDto, ProcessClaimDto, UpdateClaimDto } from './claim.dto';
+import type { CreateClaimDto, UpdateClaimDto } from './claim.dto';
 import { toAdjusterResponse, toClientResponse } from './claim.dto';
 import { createLogger } from '../../config';
 
@@ -47,13 +47,9 @@ export const ClaimController = {
   },
 
   async process(c: Context) {
-    const id   = c.req.param('id') ?? '';
-    const body = await c.req.json<ProcessClaimDto>();
-
-    if (!body.extracted) return c.json({ error: 'extracted is required.', code: 'MISSING_EXTRACTED' }, 400);
-
+    const id = c.req.param('id') ?? '';
     logger.info('Claim process', { id });
-    const claim = await ClaimService.process(id, body);
+    const claim = await ClaimService.process(id);
     return c.json(toAdjusterResponse(claim));
   },
 

@@ -1,7 +1,9 @@
 import { ClaimModel } from './claim.model';
 import { BadRequestException, NotFoundException, UnprocessableException } from '../../common/exceptions';
+import { BedrockService } from '../../common/services/bedrock.service';
+import type { DocumentSignals } from '../../common/services/bedrock.service';
 import type { Claim, CreateClaimInput } from '../../orm/entities/claim.entity';
-import type { CreateClaimDto, ProcessClaimDto, UpdateClaimDto } from './claim.dto';
+import type { CreateClaimDto, UpdateClaimDto } from './claim.dto';
 import {
   ALLOWED_CONTENT_TYPES,
   FRAUD_SIGNALS,
@@ -68,7 +70,7 @@ export const ClaimService = {
 
   // ── Process ───────────────────────────────────────────────────────────────
 
-  async process(id: string, dto: ProcessClaimDto): Promise<Claim> {
+  async process(id: string): Promise<Claim> {
     const claim = await ClaimModel.findById(id);
     if (!claim) throw new NotFoundException('Claim not found.', 'CLAIM_NOT_FOUND');
 
@@ -82,13 +84,16 @@ export const ClaimService = {
     await ClaimModel.update(id, { status: 'processing' });
 
     try {
-      const { extracted, documentSignals = {} } = dto;
+      const { extracted, documentSignals } = await BedrockService.extractFromDocument(
+        claim.documentKey,
+        claim.contentType,
+      );
 
-      const recentCount       = await ClaimService._countRecentClaims(claim.clientId);
-      const fraud             = ClaimService._computeFraudScore(extracted, documentSignals, recentCount, new Date(claim.createdAt));
-      const requiresReview    = fraud.score >= FRAUD_THRESHOLD;
-      const coverageApplies   = ClaimService._computeCoverage(extracted.claimType, extracted.descriptionSummary);
-      const priority          = ClaimService._computePriority(extracted.estimatedAmount, fraud.score, requiresReview);
+      const recentCount     = await ClaimService._countRecentClaims(claim.clientId);
+      const fraud           = ClaimService._computeFraudScore(extracted, documentSignals, recentCount, new Date(claim.createdAt));
+      const requiresReview  = fraud.score >= FRAUD_THRESHOLD;
+      const coverageApplies = ClaimService._computeCoverage(extracted.claimType, extracted.descriptionSummary);
+      const priority        = ClaimService._computePriority(extracted.estimatedAmount, fraud.score, requiresReview);
 
       const updated = await ClaimModel.update(id, {
         status:              'processed',
@@ -141,7 +146,7 @@ export const ClaimService = {
 
   _computeFraudScore(
     extracted: ExtractedData,
-    documentSignals: NonNullable<ProcessClaimDto['documentSignals']>,
+    documentSignals: DocumentSignals,
     recentClaimCount: number,
     claimCreatedAt: Date,
   ): FraudScoreResult {
