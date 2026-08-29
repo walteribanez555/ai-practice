@@ -1,0 +1,152 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_version:
+        description: "Git tag to roll back to (e.g. v1.3.0)"
+        required: true
+      reason:
+        description: "Reason for rollback (shown in job summary)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  NODE_VERSION: "22"
+  STACK_NAME: AssistanceStack-Prod
+  ENVIRONMENT: prod
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+  # ─── 1. Validate the target tag ────────────────────────────────────────────
+  validate-rollback:
+    name: Validate rollback target
+    runs-on: ubuntu-latest
+    outputs:
+      target_sha: ${{ steps.validate.outputs.target_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag
+        id: validate
+        run: |
+          TAG="${{ inputs.target_version }}"
+
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "❌ Tag '$TAG' does not exist in this repository."
+            exit 1
+          fi
+
+          TARGET_SHA=$(git rev-parse "$TAG^{commit}")
+          CURRENT_SHA=$(git rev-parse HEAD)
+
+          if [[ "$TARGET_SHA" == "$CURRENT_SHA" ]]; then
+            echo "❌ '$TAG' is already the current HEAD — nothing to roll back."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$TARGET_SHA" origin/main; then
+            echo "❌ '$TAG' ($TARGET_SHA) is not an ancestor of main. Aborting."
+            exit 1
+          fi
+
+          echo "✅ Rollback validated: $TAG → $TARGET_SHA"
+          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Write job summary
+        run: |
+          echo "## ⚠️ Rollback Initiated" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| | |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Target version** | \`${{ inputs.target_version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Target SHA** | \`${{ steps.validate.outputs.target_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Reason** | ${{ inputs.reason }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Triggered by** | @${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+
+  # ─── 2. Execute rollback ────────────────────────────────────────────────────
+  execute-rollback:
+    name: Execute rollback → ${{ inputs.target_version }}
+    runs-on: ubuntu-latest
+    needs: validate-rollback
+    environment: prod
+    env:
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_version }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install infra deps
+        run: npm ci
+        working-directory: infra
+
+      - name: CDK deploy from ${{ inputs.target_version }}
+        working-directory: infra
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        run: |
+          npx cdk deploy ${{ env.STACK_NAME }} \
+            -c environment=${{ env.ENVIRONMENT }} \
+            --require-approval never
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create audit tag
+        run: |
+          AUDIT_TAG="rollback-$(date -u +%Y%m%d-%H%M%S)"
+          git tag "$AUDIT_TAG" "${{ needs.validate-rollback.outputs.target_sha }}"
+          git push origin "$AUDIT_TAG"
+          echo "🏷️  Audit tag created: $AUDIT_TAG"
+
+  # ─── 3. Post-rollback verify ────────────────────────────────────────────────
+  post-rollback-verify:
+    name: Post-rollback verify
+    runs-on: ubuntu-latest
+    needs: execute-rollback
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Check stack status after rollback
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query 'Stacks[0].StackStatus' --output text)
+
+          echo "Stack status: $STATUS"
+
+          if [[ "$STATUS" == "UPDATE_COMPLETE" || "$STATUS" == "CREATE_COMPLETE" ]]; then
+            echo "✅ Stack healthy after rollback to ${{ inputs.target_version }}."
+          else
+            echo "❌ Stack in unexpected state after rollback: $STATUS"
+            exit 1
+          fi
+
+      - name: Write rollback summary
+        if: always()
+        run: |
+          echo "## Rollback Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Version deployed:** \`${{ inputs.target_version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Reason:** ${{ inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Stack status:** ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"

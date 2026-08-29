@@ -1,0 +1,250 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  NODE_VERSION: "22"
+  ENVIRONMENT: prod
+  STACK_NAME: AssistanceStack-Prod
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+  # ─── 1. Detect changes ──────────────────────────────────────────────────────
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      infra:       ${{ steps.filter.outputs.infra }}
+      infra_drift: ${{ steps.drift.outputs.drift }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Path filter
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            infra:
+              - 'infra/**'
+
+      - name: Install infra deps (drift check)
+        if: github.event_name != 'pull_request'
+        run: npm ci
+        working-directory: infra
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: github.event_name != 'pull_request'
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: CDK drift check
+        id: drift
+        if: github.event_name != 'pull_request'
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null \
+            || echo "DOES_NOT_EXIST")
+
+          if [[ "$STATUS" == "DOES_NOT_EXIST" ]]; then
+            echo "Stack not found — first deploy."
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          DIFF=$(cd infra && npx cdk diff ${{ env.STACK_NAME }} \
+            -c environment=${{ env.ENVIRONMENT }} 2>&1 || true)
+
+          if echo "$DIFF" | grep -qE '\[\+\]|\[-\]|\[~\]'; then
+            echo "drift=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set drift=false (PR)
+        if: github.event_name == 'pull_request'
+        run: echo "drift=false" >> "$GITHUB_OUTPUT"
+
+  # ─── 2. Validate — PRs only ─────────────────────────────────────────────────
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install infra deps
+        run: npm ci
+        working-directory: infra
+
+      - name: Type-check infra
+        run: npx tsc --noEmit
+        working-directory: infra
+
+  # ─── 3. Deploy infrastructure ───────────────────────────────────────────────
+  deploy-infra:
+    name: Deploy infra
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      github.event_name != 'pull_request' && (
+        needs.changes.outputs.infra      == 'true' ||
+        needs.changes.outputs.infra_drift == 'true' ||
+        github.event_name == 'workflow_dispatch'
+      )
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install infra deps
+        run: npm ci
+        working-directory: infra
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Ensure shared stack is deployed
+        working-directory: infra
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name AssistanceSharedStack \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null \
+            || echo "DOES_NOT_EXIST")
+
+          if [[ "$STATUS" == "DOES_NOT_EXIST" ]]; then
+            echo "Shared stack missing — deploying..."
+            npx cdk deploy AssistanceSharedStack --require-approval never
+          elif [[ "$STATUS" == *ROLLBACK* || "$STATUS" == *FAILED* ]]; then
+            echo "❌ Shared stack in '$STATUS' — manual intervention required."
+            exit 1
+          else
+            echo "✅ Shared stack exists ($STATUS)."
+          fi
+
+      - name: CDK deploy
+        working-directory: infra
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        run: |
+          npx cdk deploy ${{ env.STACK_NAME }} \
+            -c environment=${{ env.ENVIRONMENT }} \
+            --require-approval never
+
+  # ─── 4. Verify stack status ─────────────────────────────────────────────────
+  verify:
+    name: Verify deployment
+    runs-on: ubuntu-latest
+    needs: deploy-infra
+    if: needs.deploy-infra.result == 'success'
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Check stack status
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query 'Stacks[0].StackStatus' --output text)
+
+          echo "Stack status: $STATUS"
+
+          if [[ "$STATUS" == "CREATE_COMPLETE" || "$STATUS" == "UPDATE_COMPLETE" ]]; then
+            echo "✅ Stack deployed successfully."
+          else
+            echo "❌ Unexpected stack status: $STATUS"
+            exit 1
+          fi
+
+  # ─── 5. Tag & GitHub Release ────────────────────────────────────────────────
+  tag-release:
+    name: Tag & Release
+    runs-on: ubuntu-latest
+    needs: verify
+    if: needs.verify.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            LAST=$(git tag -l 'v*' --sort=-version:refname | head -1)
+            if [[ -z "$LAST" ]]; then
+              TAG="v1.0.0"
+            else
+              MAJOR=$(echo "$LAST" | sed 's/^v//' | cut -d. -f1)
+              MINOR=$(echo "$LAST" | cut -d. -f2)
+              TAG="v${MAJOR}.$((MINOR + 1)).0"
+            fi
+            git tag "$TAG" && git push origin "$TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          PREV=$(git tag -l 'v*' --sort=-version:refname | grep -v "^${TAG}$" | head -1)
+          if [[ -z "$PREV" ]]; then
+            LOG=$(git log --pretty=format:"- %s (%h)" --no-merges | head -30)
+          else
+            LOG=$(git log "${PREV}..${TAG}" --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          { echo "log<<EOF"; echo "$LOG"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes "## Changes
+          ${{ steps.changelog.outputs.log }}
+
+          ## Infrastructure
+          - Stack: \`${{ env.STACK_NAME }}\`
+          - Region: \`us-east-1\`
+          - Commit: \`${{ github.sha }}\`"
