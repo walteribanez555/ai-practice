@@ -377,11 +377,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: apps/dashboard/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dashboard deps
+      - name: Install workspace deps
         run: npm ci
-        working-directory: apps/dashboard
 
       - name: Build dashboard
         run: npm run build:prod
