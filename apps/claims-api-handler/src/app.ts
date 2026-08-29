@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { config, createLogger } from './config';
 import { claimRouter } from './modules/claim/claim.module';
 import { authRouter } from './modules/auth/auth.module';
+import { uploadRouter } from './modules/upload/upload.module';
 import type { AppEnv } from './app.types';
 
 const logger = createLogger('App');
@@ -38,7 +39,8 @@ v1.get('/health', (c) => {
   return c.json({ status: 'ok' });
 });
 
-v1.route('/auth',   authRouter);   // public  — no auth required
-v1.route('/claims', claimRouter);  // protected — auth applied per-route
+v1.route('/auth',   authRouter);    // public  — no auth required
+v1.route('/upload', uploadRouter);  // protected — presigned S3 URLs
+v1.route('/claims', claimRouter);   // protected — claim lifecycle
 
 app.route('/api/v1', v1);

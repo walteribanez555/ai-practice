@@ -88,6 +88,41 @@ export class AssistanceStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    // ─── S3 — claim documents bucket ──────────────────────────────────────────
+    //
+    // Clients upload documents directly via presigned PUT URLs (no Lambda proxy).
+    // Lifecycle: expire after 7 days — processed data lives in DynamoDB.
+    // The claims-api-handler Lambda generates presigned URLs and reads/deletes objects.
+    const documentsBucket = new s3.Bucket(this, "DocumentsBucket", {
+      bucketName:        `${serviceName}-documents`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL:        true,
+      removalPolicy:     isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: !isProd,
+      lifecycleRules: [
+        {
+          id:         "expire-documents",
+          expiration: cdk.Duration.days(7),
+          enabled:    true,
+        },
+      ],
+      cors: [
+        {
+          // Browsers need to PUT directly via presigned URL
+          allowedMethods: [s3.HttpMethods.PUT],
+          allowedOrigins: ["*"],
+          allowedHeaders: ["content-type", "content-length"],
+          maxAge:         3000,
+        },
+      ],
+    });
+
+    new cdk.CfnOutput(this, "DocumentsBucketName", {
+      value:       documentsBucket.bucketName,
+      description: "S3 bucket for claim document uploads",
+      exportName:  `${serviceName}-documents-bucket`,
+    });
+
     // ─── Shared DynamoDB policy ────────────────────────────────────────────────
 
     const dynamoPolicy = new iam.PolicyStatement({
@@ -111,9 +146,10 @@ export class AssistanceStack extends cdk.Stack {
     // Each Lambda fetches them at cold start via APP_SECRET_ARN → Secrets Manager.
 
     const sharedEnv = {
-      NODE_ENV:          isProd ? "production" : "development",
-      CLAIMS_TABLE_NAME: this.claimsTable.tableName,
-      APP_SECRET_ARN:    appSecret.secretArn,
+      NODE_ENV:              isProd ? "production" : "development",
+      CLAIMS_TABLE_NAME:     this.claimsTable.tableName,
+      APP_SECRET_ARN:        appSecret.secretArn,
+      DOCUMENTS_BUCKET_NAME: documentsBucket.bucketName,
     };
 
     const sharedBundling: lambdaNodejs.BundlingOptions = {
@@ -172,6 +208,7 @@ export class AssistanceStack extends cdk.Stack {
     });
     claimsApiRole.addToPolicy(dynamoPolicy);
     appSecret.grantRead(claimsApiRole);
+    documentsBucket.grantReadWrite(claimsApiRole);
 
     const claimsApiLogGroup = new logs.LogGroup(this, "ClaimsApiLogGroup", {
       logGroupName:  `/aws/lambda/${serviceName}-claims-api-handler`,

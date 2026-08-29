@@ -23,7 +23,7 @@
           type="email"
           placeholder="you@example.com"
           [value]="email()"
-          (valueChange)="email.set($event)"
+          (valueChange)="email.set($event.toString())"
           name="email"
           required
         />
@@ -36,7 +36,7 @@
             [type]="showPassword() ? 'text' : 'password'"
             placeholder="Enter your password"
             [value]="password()"
-            (valueChange)="password.set($event)"
+            (valueChange)="password.set($event.toString())"
             name="password"
             required
           />
