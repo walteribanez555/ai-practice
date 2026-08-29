@@ -57,8 +57,8 @@ export class AssistanceStack extends cdk.Stack {
       writeCapacity: isProd ? undefined : 5,
 
       encryption:          dynamodb.TableEncryption.AWS_MANAGED,
-      pointInTimeRecovery: isProd,
-      removalPolicy:       isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      pointInTimeRecoverySpecification: isProd ? { pointInTimeRecoveryEnabled: true } : undefined,
+      removalPolicy:                    isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: "ttl",
     });
 

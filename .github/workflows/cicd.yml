@@ -126,7 +126,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: infra/package-lock.json
+          cache-dependency-path: package-lock.json
+
+      - name: Install workspace deps
+        run: npm ci
 
       - name: Install infra deps
         run: npm ci
