@@ -1,9 +1,13 @@
+import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import type { Context } from 'hono';
 import type { AppEnv } from '../../app.types';
 import { ClaimService } from './claim.service';
-import type { CreateClaimDto, ProcessClaimDto, UpdateClaimDto } from './claim.dto';
+import type { CreateClaimDto, UpdateClaimDto } from './claim.dto';
 import { toAdjusterResponse, toClientResponse } from './claim.dto';
 import { createLogger } from '../../config';
+
+const sfnClient = new SFNClient({});
+const SF_ARN    = process.env.CLAIM_PROCESSING_SF_ARN ?? '';
 
 const logger = createLogger('ClaimController');
 
@@ -72,14 +76,38 @@ export const ClaimController = {
 
   // ── POST /claims/:id/process — adjuster only ─────────────────────────────
   async process(c: Context<AppEnv>) {
-    const id   = c.req.param('id') ?? '';
-    const body = await c.req.json<ProcessClaimDto>();
+    const id    = c.req.param('id') ?? '';
+    const claim = await ClaimService.findById(id);
+    if (!claim) return c.json({ error: 'Claim not found.', code: 'CLAIM_NOT_FOUND' }, 404);
 
-    if (!body.extracted) return c.json({ error: 'extracted is required.', code: 'MISSING_EXTRACTED' }, 400);
+    if (claim.status !== 'pending') {
+      return c.json(
+        { error: `Cannot process a claim in status "${claim.status}".`, code: 'INVALID_STATUS_TRANSITION' },
+        422,
+      );
+    }
 
-    logger.info('Claim process', { id });
-    const claim = await ClaimService.process(id, body);
-    return c.json(toAdjusterResponse(claim));
+    // Build the documents array: prefer the stored documents[], fall back to single documentKey
+    const documents = claim.documents?.length
+      ? claim.documents
+      : [{ key: claim.documentKey, contentType: claim.contentType, fileSizeBytes: claim.fileSizeBytes }];
+
+    await ClaimService.markProcessing(id);
+
+    logger.info('Starting claim processing state machine', { id, documentCount: documents.length });
+
+    await sfnClient.send(new StartExecutionCommand({
+      stateMachineArn: SF_ARN,
+      name:            `claim-${id}-${Date.now()}`,
+      input:           JSON.stringify({
+        claimId:   claim.id,
+        clientId:  claim.clientId,
+        policyId:  claim.policyId,
+        documents,
+      }),
+    }));
+
+    return c.json({ id, status: 'processing', message: 'Analysis started.' }, 202);
   },
 
   // ── PATCH /claims/:id — adjuster only ────────────────────────────────────

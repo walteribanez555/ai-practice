@@ -66,7 +66,13 @@ export const ClaimService = {
     return ClaimModel.create(input);
   },
 
-  // ── Process ───────────────────────────────────────────────────────────────
+  // ── Mark processing (used by controller before starting Step Functions) ──
+
+  markProcessing(id: string): Promise<Claim | null> {
+    return ClaimModel.update(id, { status: 'processing' });
+  },
+
+  // ── Process (legacy — kept for local dev; production uses Step Functions) ─
 
   async process(id: string, dto: ProcessClaimDto): Promise<Claim> {
     const claim = await ClaimModel.findById(id);

@@ -24,6 +24,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-sfn": "^3.1121.0",
     "@hono/node-server": "^2.0.3",
     "bcryptjs": "^3.0.3",
     "hono": "^4.6.0",

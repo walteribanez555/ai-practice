@@ -5,16 +5,23 @@ import type { ClaimStatus, Coverage, Priority } from '../../modules/claim/claim.
 
 // ── Shape ─────────────────────────────────────────────────────────────────────
 
+export interface DocumentRef {
+  key:           string;
+  contentType:   string;
+  fileSizeBytes?: number;
+}
+
 export interface Claim extends Record<string, unknown> {
   id: string;
   status: ClaimStatus;
   // Client info
   clientId: string;
   policyId?: string;
-  // Document reference
+  // Document references — primary doc kept for backward compat; use documents[] for multi-doc
   documentKey: string;
   contentType: string;
   fileSizeBytes: number;
+  documents?: DocumentRef[];
   // Extracted fields (absent = could not be read with confidence)
   claimType?: string;
   estimatedAmount?: number;

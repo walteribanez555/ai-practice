@@ -1,5 +1,7 @@
 import type { Tool } from '@aws-sdk/client-bedrock-runtime';
 
+// ── Extraction ────────────────────────────────────────────────────────────────
+
 export const SYSTEM_PROMPT = `You are an insurance claims specialist AI. Your task is to analyze insurance claim documents (photos or PDFs) and extract structured information accurately.
 
 Be precise and conservative:
@@ -71,6 +73,46 @@ export const CLAIM_EXTRACTION_TOOL: Tool = {
           'descriptionSummary',
           'documentSignals',
         ],
+      },
+    },
+  },
+};
+
+// ── Integrity analysis ────────────────────────────────────────────────────────
+
+export const INTEGRITY_SYSTEM_PROMPT = `You are a document forensics specialist for an insurance company.
+Analyze claim documents for signs of fraud, alteration, or poor quality.
+Be objective and conservative — only flag genuine concerns, not ambiguous ones.`;
+
+export const INTEGRITY_USER_PROMPT =
+  'Assess this document for quality and integrity issues using the analyze_integrity tool.';
+
+export const ANALYZE_INTEGRITY_TOOL: Tool = {
+  toolSpec: {
+    name:        'analyze_integrity',
+    description: 'Assess a claim document for quality and integrity issues that may indicate fraud.',
+    inputSchema: {
+      json: {
+        type: 'object',
+        properties: {
+          lowQualityDocument: {
+            type:        'boolean',
+            description: 'True if the document is blurry, poorly lit, or unreadable in key areas.',
+          },
+          possibleAlteration: {
+            type:        'boolean',
+            description: 'True if there are signs of editing: inconsistent fonts, pixelation around numbers or dates, misaligned text blocks.',
+          },
+          inconsistentParties: {
+            type:        'boolean',
+            description: 'True if names, ID numbers, or party information contradict each other within the document.',
+          },
+          observations: {
+            type:        'string',
+            description: 'Brief professional assessment of the document quality and any specific concerns found.',
+          },
+        },
+        required: ['lowQualityDocument', 'possibleAlteration', 'inconsistentParties', 'observations'],
       },
     },
   },
