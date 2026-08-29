@@ -1,10 +1,13 @@
 import * as cdk from "aws-cdk-lib";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import * as path from "path";
@@ -20,6 +23,8 @@ export class AssistanceStack extends cdk.Stack {
   public readonly processClaimFn: lambdaNodejs.NodejsFunction;
   public readonly claimsApiFn: lambdaNodejs.NodejsFunction;
   public readonly claimsHttpApi: apigatewayv2.CfnApi;
+  public readonly dashboardBucket: s3.Bucket;
+  public readonly dashboardDistribution: cloudfront.Distribution;
 
   constructor(scope: Construct, id: string, props: AssistanceStackProps) {
     super(scope, id, props);
@@ -257,6 +262,60 @@ export class AssistanceStack extends cdk.Stack {
       sourceArn:    `arn:aws:execute-api:${this.region}:${this.account}:${this.claimsHttpApi.ref}/*/*`,
     });
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Dashboard — S3 + CloudFront
+    //
+    // Angular SPA served via CloudFront → S3 (no public bucket access).
+    // 403/404 → index.html (200) so Angular's client-side router handles all paths.
+    // Invalidation must target /* to clear all cached assets on each deploy.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    this.dashboardBucket = new s3.Bucket(this, "DashboardBucket", {
+      bucketName:         `${serviceName}-dashboard`,
+      blockPublicAccess:  s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL:         true,
+      removalPolicy:      isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects:  !isProd,
+    });
+
+    // OAI — lets CloudFront read from the private bucket
+    const dashboardOai = new cloudfront.OriginAccessIdentity(this, "DashboardOAI", {
+      comment: `OAI for ${serviceName} dashboard`,
+    });
+    this.dashboardBucket.grantRead(dashboardOai);
+
+    this.dashboardDistribution = new cloudfront.Distribution(this, "DashboardDistribution", {
+      defaultRootObject: "index.html",
+      defaultBehavior: {
+        origin: new origins.S3Origin(this.dashboardBucket, {
+          originAccessIdentity: dashboardOai,
+        }),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        allowedMethods:       cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+        cachedMethods:        cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+        cachePolicy:          cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        compress:             true,
+      },
+      // Angular routing: any unknown path returns index.html so the SPA router handles it
+      errorResponses: [
+        {
+          httpStatus:       403,
+          responseHttpStatus: 200,
+          responsePagePath: "/index.html",
+          ttl:              cdk.Duration.seconds(0),
+        },
+        {
+          httpStatus:       404,
+          responseHttpStatus: 200,
+          responsePagePath: "/index.html",
+          ttl:              cdk.Duration.seconds(0),
+        },
+      ],
+      priceClass:              cloudfront.PriceClass.PRICE_CLASS_100,
+      minimumProtocolVersion:  cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+      enableLogging:           false,
+    });
+
     // ─── Stack outputs ─────────────────────────────────────────────────────────
 
     new cdk.CfnOutput(this, "ClaimsTableName", {
@@ -287,6 +346,24 @@ export class AssistanceStack extends cdk.Stack {
       value:       `https://${this.claimsHttpApi.ref}.execute-api.${this.region}.amazonaws.com`,
       description: "Claims API Gateway endpoint URL",
       exportName:  `${serviceName}-claims-api-endpoint`,
+    });
+
+    new cdk.CfnOutput(this, "DashboardBucketName", {
+      value:       this.dashboardBucket.bucketName,
+      description: "S3 bucket for the Angular dashboard",
+      exportName:  `${serviceName}-dashboard-bucket`,
+    });
+
+    new cdk.CfnOutput(this, "DashboardDistributionId", {
+      value:       this.dashboardDistribution.distributionId,
+      description: "CloudFront distribution ID — use for cache invalidations",
+      exportName:  `${serviceName}-dashboard-distribution-id`,
+    });
+
+    new cdk.CfnOutput(this, "DashboardUrl", {
+      value:       `https://${this.dashboardDistribution.distributionDomainName}`,
+      description: "Dashboard public URL",
+      exportName:  `${serviceName}-dashboard-url`,
     });
 
     new cdk.CfnOutput(this, "SecretBootstrapCommand", {
