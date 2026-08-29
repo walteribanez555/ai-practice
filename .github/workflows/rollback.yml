@@ -15,7 +15,7 @@ permissions:
 
 env:
   AWS_DEFAULT_REGION: us-east-1
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
   STACK_NAME: AssistanceStack-Prod
   ENVIRONMENT: prod
 
@@ -89,6 +89,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: infra/package-lock.json
 
       - name: Install infra deps
         run: npm ci
