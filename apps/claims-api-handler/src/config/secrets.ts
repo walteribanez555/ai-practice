@@ -4,19 +4,14 @@ import { createLogger } from './logger';
 const logger = createLogger('Secrets');
 const client = new SecretsManagerClient({});
 
-let loaded = false;
-
 /**
- * Fetches the app secret from Secrets Manager and injects its keys into
- * process.env. Runs once per Lambda container (cold start); subsequent
- * calls are no-ops because `loaded` is kept in module scope.
+ * Starts fetching secrets immediately when the module is loaded (cold start).
+ * The handler awaits this promise — by the time the first request arrives,
+ * the fetch is already in flight or complete, so there is no extra latency.
  *
- * In local development APP_SECRET_ARN is absent, so the function exits early
- * and the .env file values take precedence.
+ * In local development APP_SECRET_ARN is absent, so the promise resolves instantly.
  */
-export async function loadSecrets(): Promise<void> {
-  if (loaded) return;
-
+const _ready: Promise<void> = (async () => {
   const arn = process.env.APP_SECRET_ARN;
   if (!arn) {
     logger.debug('APP_SECRET_ARN not set — skipping secret load (local dev)');
@@ -32,6 +27,8 @@ export async function loadSecrets(): Promise<void> {
     }
   }
 
-  loaded = true;
   logger.debug('Secrets loaded', { arn });
-}
+})();
+
+/** Await this in the handler to ensure secrets are ready before processing. */
+export const waitForSecrets = (): Promise<void> => _ready;
