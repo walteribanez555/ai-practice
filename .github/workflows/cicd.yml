@@ -29,8 +29,10 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      infra:       ${{ steps.filter.outputs.infra }}
-      infra_drift: ${{ steps.drift.outputs.drift }}
+      infra:         ${{ steps.filter.outputs.infra }}
+      infra_drift:   ${{ steps.drift.outputs.drift }}
+      process_claim: ${{ steps.filter.outputs.process_claim }}
+      claims_api:    ${{ steps.filter.outputs.claims_api }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +45,10 @@ jobs:
           filters: |
             infra:
               - 'infra/**'
+            process_claim:
+              - 'apps/process-claim-document/**'
+            claims_api:
+              - 'apps/claims-api-handler/**'
 
       - name: Install infra deps (drift check)
         if: github.event_name != 'pull_request'
@@ -97,7 +103,18 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: infra/package-lock.json
+          cache-dependency-path: package-lock.json
+
+      - name: Install workspace deps
+        run: npm ci
+
+      - name: Type-check process-claim-document
+        run: npx tsc --noEmit
+        working-directory: apps/process-claim-document
+
+      - name: Type-check claims-api-handler
+        run: npx tsc --noEmit
+        working-directory: apps/claims-api-handler
 
       - name: Install infra deps
         run: npm ci
@@ -170,12 +187,150 @@ jobs:
             -c environment=${{ env.ENVIRONMENT }} \
             --require-approval never
 
-  # ─── 4. Verify stack status ─────────────────────────────────────────────────
-  verify:
-    name: Verify deployment
+  # ─── 4. Deploy process-claim-document (internal Lambda) ─────────────────────
+  deploy-process-claim:
+    name: Deploy process-claim-document
     runs-on: ubuntu-latest
-    needs: deploy-infra
-    if: needs.deploy-infra.result == 'success'
+    needs: [changes, deploy-infra]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' && (
+        needs.changes.outputs.process_claim == 'true' ||
+        github.event_name == 'workflow_dispatch'
+      ) &&
+      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install workspace deps
+        run: npm ci
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Lint
+        run: npm run lint
+        working-directory: apps/process-claim-document
+
+      - name: Build Lambda
+        run: npm run build:lambda:prod
+        working-directory: apps/process-claim-document
+
+      - name: Package artifact
+        run: cd apps/process-claim-document/dist && zip ../../../deploy-process-claim.zip index.js
+
+      - name: Report artifact size
+        run: |
+          SIZE_BYTES=$(stat -c%s deploy-process-claim.zip)
+          SIZE_KB=$(echo "scale=2; $SIZE_BYTES / 1024" | bc)
+          SIZE_MB=$(echo "scale=4; $SIZE_BYTES / 1048576" | bc)
+          echo "deploy-process-claim.zip → ${SIZE_BYTES} bytes (${SIZE_KB} KB / ${SIZE_MB} MB)"
+
+      - name: Deploy to Lambda
+        run: |
+          FUNCTION_NAME="assistance-prod-process-claim-document"
+          RETRY_COUNT=5
+          RETRY_INTERVAL=10
+
+          for i in $(seq 1 $RETRY_COUNT); do
+            aws lambda update-function-code \
+              --function-name "$FUNCTION_NAME" \
+              --zip-file fileb://deploy-process-claim.zip && break
+            if [ "$i" -eq "$RETRY_COUNT" ]; then
+              echo "❌ Max retries reached."
+              exit 1
+            fi
+            echo "Retrying in ${RETRY_INTERVAL}s... (attempt $i/$RETRY_COUNT)"
+            sleep $RETRY_INTERVAL
+          done
+
+          echo "✅ Lambda updated: $FUNCTION_NAME"
+
+  # ─── 5. Deploy claims-api-handler (external Lambda + API Gateway) ────────────
+  deploy-claims-api:
+    name: Deploy claims-api-handler
+    runs-on: ubuntu-latest
+    needs: [changes, deploy-infra]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' && (
+        needs.changes.outputs.claims_api == 'true' ||
+        github.event_name == 'workflow_dispatch'
+      ) &&
+      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install workspace deps
+        run: npm ci
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Lint
+        run: npm run lint
+        working-directory: apps/claims-api-handler
+
+      - name: Build Lambda
+        run: npm run build:lambda:prod
+        working-directory: apps/claims-api-handler
+
+      - name: Package artifact
+        run: cd apps/claims-api-handler/dist && zip ../../../deploy-claims-api.zip index.js
+
+      - name: Report artifact size
+        run: |
+          SIZE_BYTES=$(stat -c%s deploy-claims-api.zip)
+          SIZE_KB=$(echo "scale=2; $SIZE_BYTES / 1024" | bc)
+          SIZE_MB=$(echo "scale=4; $SIZE_BYTES / 1048576" | bc)
+          echo "deploy-claims-api.zip → ${SIZE_BYTES} bytes (${SIZE_KB} KB / ${SIZE_MB} MB)"
+
+      - name: Deploy to Lambda
+        run: |
+          FUNCTION_NAME="assistance-prod-claims-api-handler"
+          RETRY_COUNT=5
+          RETRY_INTERVAL=10
+
+          for i in $(seq 1 $RETRY_COUNT); do
+            aws lambda update-function-code \
+              --function-name "$FUNCTION_NAME" \
+              --zip-file fileb://deploy-claims-api.zip && break
+            if [ "$i" -eq "$RETRY_COUNT" ]; then
+              echo "❌ Max retries reached."
+              exit 1
+            fi
+            echo "Retrying in ${RETRY_INTERVAL}s... (attempt $i/$RETRY_COUNT)"
+            sleep $RETRY_INTERVAL
+          done
+
+          echo "✅ Lambda updated: $FUNCTION_NAME"
+
+  # ─── 6. Health check — claims-api-handler endpoint ──────────────────────────
+  health:
+    name: Health check
+    runs-on: ubuntu-latest
+    needs: deploy-claims-api
+    if: needs.deploy-claims-api.result == 'success'
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -183,27 +338,40 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
-      - name: Check stack status
+      - name: Get API endpoint
+        id: endpoint
         run: |
-          STATUS=$(aws cloudformation describe-stacks \
+          URL=$(aws cloudformation describe-stacks \
             --stack-name ${{ env.STACK_NAME }} \
-            --query 'Stacks[0].StackStatus' --output text)
+            --query 'Stacks[0].Outputs[?OutputKey==`ClaimsApiEndpoint`].OutputValue' \
+            --output text)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "🚀 API endpoint: $URL"
 
-          echo "Stack status: $STATUS"
+      - name: Wait for Lambda cold start
+        run: sleep 5
 
-          if [[ "$STATUS" == "CREATE_COMPLETE" || "$STATUS" == "UPDATE_COMPLETE" ]]; then
-            echo "✅ Stack deployed successfully."
-          else
-            echo "❌ Unexpected stack status: $STATUS"
-            exit 1
-          fi
+      - name: GET /api/v1/health
+        run: |
+          URL="${{ steps.endpoint.outputs.url }}"
+          for i in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/api/v1/health")
+            echo "Attempt $i → HTTP $STATUS"
+            [[ "$STATUS" == "200" ]] && echo "✅ Health endpoint healthy." && exit 0
+            sleep 10
+          done
+          echo "❌ Health endpoint unreachable." && exit 1
 
-  # ─── 5. Tag & GitHub Release ────────────────────────────────────────────────
+  # ─── 7. Tag & GitHub Release ────────────────────────────────────────────────
   tag-release:
     name: Tag & Release
     runs-on: ubuntu-latest
-    needs: verify
-    if: needs.verify.result == 'success'
+    needs: [deploy-process-claim, deploy-claims-api, health]
+    if: |
+      always() && !cancelled() && (
+        needs.deploy-process-claim.result == 'success' ||
+        needs.deploy-claims-api.result   == 'success'
+      )
     steps:
       - uses: actions/checkout@v4
         with:
@@ -248,6 +416,10 @@ jobs:
             --title "${{ steps.tag.outputs.tag }}" \
             --notes "## Changes
           ${{ steps.changelog.outputs.log }}
+
+          ## Services deployed
+          - process-claim-document: \`assistance-prod-process-claim-document\`
+          - claims-api-handler: \`assistance-prod-claims-api-handler\`
 
           ## Infrastructure
           - Stack: \`${{ env.STACK_NAME }}\`
