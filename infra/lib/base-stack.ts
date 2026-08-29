@@ -46,6 +46,22 @@ export class AssistanceStack extends cdk.Stack {
       this, "AppSecret", `${projectName}/${this.appEnv}/app`,
     );
 
+    // ─── DynamoDB — users table ───────────────────────────────────────────────
+    //
+    // Access patterns:
+    //   PK  email  → get user by email (login)
+    const usersTable = new dynamodb.Table(this, "UsersTable", {
+      tableName:    `${serviceName}-users`,
+      partitionKey: { name: "email", type: dynamodb.AttributeType.STRING },
+
+      billingMode:   isProd ? dynamodb.BillingMode.PAY_PER_REQUEST : dynamodb.BillingMode.PROVISIONED,
+      readCapacity:  isProd ? undefined : 5,
+      writeCapacity: isProd ? undefined : 5,
+
+      encryption:    dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+    });
+
     // ─── DynamoDB — claims table ───────────────────────────────────────────────
     //
     // Access patterns:
@@ -126,7 +142,7 @@ export class AssistanceStack extends cdk.Stack {
     // ─── Shared DynamoDB policy ────────────────────────────────────────────────
 
     const dynamoPolicy = new iam.PolicyStatement({
-      sid:     "AllowClaimsTableAccess",
+      sid:     "AllowDynamoAccess",
       actions: [
         "dynamodb:GetItem",
         "dynamodb:PutItem",
@@ -138,6 +154,7 @@ export class AssistanceStack extends cdk.Stack {
       resources: [
         this.claimsTable.tableArn,
         `${this.claimsTable.tableArn}/index/*`,
+        usersTable.tableArn,
       ],
     });
 
@@ -148,6 +165,7 @@ export class AssistanceStack extends cdk.Stack {
     const sharedEnv = {
       NODE_ENV:              isProd ? "production" : "development",
       CLAIMS_TABLE_NAME:     this.claimsTable.tableName,
+      USERS_TABLE_NAME:      usersTable.tableName,
       APP_SECRET_ARN:        appSecret.secretArn,
       DOCUMENTS_BUCKET_NAME: documentsBucket.bucketName,
     };
@@ -354,6 +372,12 @@ export class AssistanceStack extends cdk.Stack {
     });
 
     // ─── Stack outputs ─────────────────────────────────────────────────────────
+
+    new cdk.CfnOutput(this, "UsersTableName", {
+      value:       usersTable.tableName,
+      description: "DynamoDB users table name",
+      exportName:  `${serviceName}-users-table-name`,
+    });
 
     new cdk.CfnOutput(this, "ClaimsTableName", {
       value:       this.claimsTable.tableName,

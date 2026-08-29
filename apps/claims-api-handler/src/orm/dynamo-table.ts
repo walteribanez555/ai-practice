@@ -77,9 +77,13 @@ export class DynamoTable<T extends Record<string, unknown>> {
   ) {}
 
   async get(id: string): Promise<T | null> {
+    return this.getByPk({ id });
+  }
+
+  async getByPk(key: Record<string, unknown>): Promise<T | null> {
     const res = await this.client.send(new GetCommand({
       TableName: this.tableName,
-      Key: { id },
+      Key: key,
     }));
     return (res.Item as T) ?? null;
   }
