@@ -1,65 +1,66 @@
 import { ClaimModel } from './claim.model';
 import { BadRequestException, NotFoundException, UnprocessableException } from '../../common/exceptions';
 import type { Claim, CreateClaimInput } from '../../orm/entities/claim.entity';
-import type { FindManyOptions } from '../../orm/orm';
 import type { CreateClaimDto, ProcessClaimDto, UpdateClaimDto } from './claim.dto';
 import {
   ALLOWED_CONTENT_TYPES,
   FRAUD_SIGNALS,
   FRAUD_THRESHOLD,
+  HIGH_AMOUNT_THRESHOLD,
   MAX_CLAIMS_30_DAYS,
   MAX_FILE_SIZE_BYTES,
-  MONTO_ALTO_THRESHOLD,
-  MONTO_TIPICO,
-  type CoberturaAplica,
+  TYPICAL_AMOUNT_RANGE,
+  type ClaimType,
+  type Coverage,
   type ExtractedData,
-  type FraudSignalResult,
-  type Prioridad,
-  type TipoSiniestro,
+  type FraudScoreResult,
+  type Priority,
 } from './claim.types';
 
 export const ClaimService = {
 
   // ── Read ──────────────────────────────────────────────────────────────────
 
-  findAll(options?: FindManyOptions): Promise<Claim[]> {
-    return ClaimModel.findAll(options);
+  findAll(): Promise<Claim[]> {
+    return ClaimModel.findAll();
   },
 
   findById(id: string): Promise<Claim | null> {
     return ClaimModel.findById(id);
   },
 
-  findByClientId(clientId: string, options?: FindManyOptions): Promise<Claim[]> {
-    return ClaimModel.findByClientId(clientId, options);
+  findByClientId(clientId: string): Promise<Claim[]> {
+    return ClaimModel.findByClientId(clientId);
+  },
+
+  findByStatus(status: Claim['status']): Promise<Claim[]> {
+    return ClaimModel.findByStatus(status);
   },
 
   // ── Create ────────────────────────────────────────────────────────────────
 
   async create(dto: CreateClaimDto): Promise<Claim> {
-    // Rule: content_type must be jpeg | png | pdf
     if (!ALLOWED_CONTENT_TYPES.includes(dto.contentType as never)) {
       throw new BadRequestException(
-        `content_type "${dto.contentType}" no está permitido. Aceptados: ${ALLOWED_CONTENT_TYPES.join(', ')}.`,
+        `contentType "${dto.contentType}" is not allowed. Accepted: ${ALLOWED_CONTENT_TYPES.join(', ')}.`,
         'INVALID_CONTENT_TYPE',
       );
     }
 
-    // Rule: file size must not exceed 15 MB
     if (dto.fileSizeBytes > MAX_FILE_SIZE_BYTES) {
       const mb = (dto.fileSizeBytes / 1024 / 1024).toFixed(1);
       throw new BadRequestException(
-        `El archivo pesa ${mb} MB y supera el límite de 15 MB.`,
+        `File size ${mb} MB exceeds the 15 MB limit.`,
         'FILE_TOO_LARGE',
       );
     }
 
     const input: CreateClaimInput = {
-      client_id:       dto.clientId,
-      document_key:    dto.documentKey,
-      content_type:    dto.contentType,
-      file_size_bytes: dto.fileSizeBytes,
-      ...(dto.policyId ? { policy_id: dto.policyId } : {}),
+      clientId:      dto.clientId,
+      documentKey:   dto.documentKey,
+      contentType:   dto.contentType,
+      fileSizeBytes: dto.fileSizeBytes,
+      ...(dto.policyId ? { policyId: dto.policyId } : {}),
     };
 
     return ClaimModel.create(input);
@@ -67,91 +68,64 @@ export const ClaimService = {
 
   // ── Process ───────────────────────────────────────────────────────────────
 
-  /**
-   * Applies all business rules to an extracted claim document.
-   * Transitions: pendiente → procesando → procesado | error
-   */
   async process(id: string, dto: ProcessClaimDto): Promise<Claim> {
     const claim = await ClaimModel.findById(id);
-    if (!claim) throw new NotFoundException('Reclamo no encontrado.', 'CLAIM_NOT_FOUND');
+    if (!claim) throw new NotFoundException('Claim not found.', 'CLAIM_NOT_FOUND');
 
-    if (claim.status !== 'pendiente') {
+    if (claim.status !== 'pending') {
       throw new UnprocessableException(
-        `No se puede procesar un reclamo en estado "${claim.status}".`,
+        `Cannot process a claim in status "${claim.status}".`,
         'INVALID_STATUS_TRANSITION',
       );
     }
 
-    // Transition → procesando
-    await ClaimModel.update(id, { status: 'procesando' });
+    await ClaimModel.update(id, { status: 'processing' });
 
     try {
       const { extracted, documentSignals = {} } = dto;
 
-      // ── Fraud score ───────────────────────────────────────────────────────
-      const recentCount = await ClaimService._countRecentClaims(claim.client_id);
-      const fraud = ClaimService._computeFraudScore(
-        extracted,
-        documentSignals,
-        recentCount,
-        claim.created_at,
-      );
+      const recentCount       = await ClaimService._countRecentClaims(claim.clientId);
+      const fraud             = ClaimService._computeFraudScore(extracted, documentSignals, recentCount, new Date(claim.createdAt));
+      const requiresReview    = fraud.score >= FRAUD_THRESHOLD;
+      const coverageApplies   = ClaimService._computeCoverage(extracted.claimType, extracted.descriptionSummary);
+      const priority          = ClaimService._computePriority(extracted.estimatedAmount, fraud.score, requiresReview);
 
-      const requiereRevision = fraud.score >= FRAUD_THRESHOLD;
-
-      // ── Coverage ──────────────────────────────────────────────────────────
-      const coberturaAplica = ClaimService._computeCoverage(
-        extracted.tipo_siniestro,
-        extracted.descripcion_resumen,
-      );
-
-      // ── Priority ──────────────────────────────────────────────────────────
-      const prioridad = ClaimService._computePriority(
-        extracted.monto_estimado,
-        fraud.score,
-        requiereRevision,
-      );
-
-      // ── Persist final state ───────────────────────────────────────────────
       const updated = await ClaimModel.update(id, {
-        status:                   'procesado',
-        tipo_siniestro:           extracted.tipo_siniestro,
-        monto_estimado:           extracted.monto_estimado,
-        fecha_incidente:          extracted.fecha_incidente
-                                    ? new Date(extracted.fecha_incidente)
-                                    : null,
-        partes_involucradas:      extracted.partes_involucradas,
-        descripcion_resumen:      extracted.descripcion_resumen,
-        score_riesgo_fraude:      fraud.score,
-        justificacion_riesgo:     fraud.justificacion.join(' | ') || null,
-        cobertura_aplica:         coberturaAplica,
-        requiere_revision_humana: requiereRevision,
-        prioridad,
-        processed_at:             new Date(),
+        status:              'processed',
+        claimType:           extracted.claimType          ?? undefined,
+        estimatedAmount:     extracted.estimatedAmount    ?? undefined,
+        incidentDate:        extracted.incidentDate       ?? undefined,
+        involvedParties:     extracted.involvedParties    ?? undefined,
+        descriptionSummary:  extracted.descriptionSummary ?? undefined,
+        fraudRiskScore:      fraud.score,
+        riskJustification:   fraud.signals.join(' | ') || undefined,
+        coverageApplies,
+        requiresHumanReview: requiresReview,
+        priority,
+        processedAt:         new Date().toISOString(),
       });
 
       return updated!;
     } catch (err) {
-      // Any failure during processing → error state for manual review
-      const razon = err instanceof Error ? err.message : 'Error desconocido durante el procesamiento.';
-      await ClaimModel.update(id, { status: 'error', error_razon: razon });
+      const reason = err instanceof Error ? err.message : 'Unknown processing error.';
+      await ClaimModel.update(id, { status: 'error', errorReason: reason });
       throw err;
     }
   },
 
-  // ── Update (adjuster edits) ───────────────────────────────────────────────
+  // ── Update ────────────────────────────────────────────────────────────────
 
   async update(id: string, dto: UpdateClaimDto): Promise<Claim> {
     const claim = await ClaimModel.findById(id);
-    if (!claim) throw new NotFoundException('Reclamo no encontrado.', 'CLAIM_NOT_FOUND');
+    if (!claim) throw new NotFoundException('Claim not found.', 'CLAIM_NOT_FOUND');
 
     const updated = await ClaimModel.update(id, {
-      ...(dto.tipoSiniestro      !== undefined && { tipo_siniestro:      dto.tipoSiniestro }),
-      ...(dto.montoEstimado      !== undefined && { monto_estimado:      dto.montoEstimado }),
-      ...(dto.fechaIncidente     !== undefined && { fecha_incidente:     new Date(dto.fechaIncidente) }),
-      ...(dto.partesInvolucradas !== undefined && { partes_involucradas: dto.partesInvolucradas }),
-      ...(dto.descripcionResumen !== undefined && { descripcion_resumen: dto.descripcionResumen }),
-      ...(dto.coberturaAplica    !== undefined && { cobertura_aplica:    dto.coberturaAplica }),
+      ...(dto.claimType          !== undefined && { claimType:          dto.claimType }),
+      ...(dto.estimatedAmount    !== undefined && { estimatedAmount:    dto.estimatedAmount }),
+      ...(dto.incidentDate       !== undefined && { incidentDate:       dto.incidentDate }),
+      ...(dto.involvedParties    !== undefined && { involvedParties:    dto.involvedParties }),
+      ...(dto.descriptionSummary !== undefined && { descriptionSummary: dto.descriptionSummary }),
+      ...(dto.coverageApplies    !== undefined && { coverageApplies:    dto.coverageApplies }),
     });
 
     return updated!;
@@ -163,98 +137,71 @@ export const ClaimService = {
     return ClaimModel.delete(id);
   },
 
-  // ── Business logic (pure functions) ───────────────────────────────────────
+  // ── Business logic (pure functions) ──────────────────────────────────────
 
   _computeFraudScore(
     extracted: ExtractedData,
-    documentSignals: ProcessClaimDto['documentSignals'],
+    documentSignals: NonNullable<ProcessClaimDto['documentSignals']>,
     recentClaimCount: number,
     claimCreatedAt: Date,
-  ): FraudSignalResult {
+  ): FraudScoreResult {
     let score = 0;
-    const justificacion: string[] = [];
+    const signals: string[] = [];
 
-    // Signal: fecha_incidente inconsistente con la fecha del documento
-    if (extracted.fecha_incidente) {
-      const incidente = new Date(extracted.fecha_incidente);
-      const diffDays  = Math.abs(
-        (claimCreatedAt.getTime() - incidente.getTime()) / (1000 * 60 * 60 * 24),
+    // Signal: incident date inconsistent with document creation date
+    if (extracted.incidentDate) {
+      const incident = new Date(extracted.incidentDate);
+      const diffDays = Math.abs(
+        (claimCreatedAt.getTime() - incident.getTime()) / (1000 * 60 * 60 * 24),
       );
-      // > 365 días de diferencia entre el incidente y la apertura del reclamo
       if (diffDays > 365) {
-        score += FRAUD_SIGNALS.FECHA_INCONSISTENTE;
-        justificacion.push(
-          `Fecha del incidente con más de ${Math.round(diffDays)} días de diferencia respecto al reclamo.`,
-        );
+        score += FRAUD_SIGNALS.DATE_INCONSISTENT;
+        signals.push(`Incident date is ${Math.round(diffDays)} days apart from claim creation.`);
       }
     }
 
-    // Signal: monto fuera del rango típico para el tipo_siniestro
-    if (extracted.monto_estimado !== null && extracted.tipo_siniestro) {
-      const tipo = extracted.tipo_siniestro as TipoSiniestro;
-      const rango = MONTO_TIPICO[tipo] ?? MONTO_TIPICO.otro;
-      if (
-        extracted.monto_estimado < rango.min ||
-        extracted.monto_estimado > rango.max
-      ) {
-        score += FRAUD_SIGNALS.MONTO_FUERA_DE_RANGO;
-        justificacion.push(
-          `Monto $${extracted.monto_estimado} fuera del rango típico [$${rango.min}–$${rango.max}] para "${tipo}".`,
-        );
+    // Signal: amount outside the typical range for the claim type
+    if (extracted.estimatedAmount !== null && extracted.claimType) {
+      const type  = extracted.claimType as ClaimType;
+      const range = TYPICAL_AMOUNT_RANGE[type] ?? TYPICAL_AMOUNT_RANGE.other;
+      if (extracted.estimatedAmount < range.min || extracted.estimatedAmount > range.max) {
+        score += FRAUD_SIGNALS.AMOUNT_OUT_OF_RANGE;
+        signals.push(`Amount $${extracted.estimatedAmount} is outside the typical range [$${range.min}–$${range.max}] for "${type}".`);
       }
     }
 
-    // Signal: documento de baja calidad o posible alteración
-    if (documentSignals?.bajaCalidadDocumento || documentSignals?.posibleAlteracion) {
-      score += FRAUD_SIGNALS.DOCUMENTO_BAJA_CALIDAD;
-      justificacion.push('Documento de baja calidad o posible alteración detectada.');
+    // Signal: low quality document or possible alteration
+    if (documentSignals.lowQualityDocument || documentSignals.possibleAlteration) {
+      score += FRAUD_SIGNALS.LOW_QUALITY_DOCUMENT;
+      signals.push('Low quality document or possible alteration detected.');
     }
 
-    // Signal: partes involucradas inconsistentes
-    if (documentSignals?.partesInconsistentes) {
-      score += FRAUD_SIGNALS.PARTES_INCONSISTENTES;
-      justificacion.push('Partes involucradas con inconsistencias entre secciones del documento.');
+    // Signal: inconsistent parties across document sections
+    if (documentSignals.inconsistentParties) {
+      score += FRAUD_SIGNALS.PARTIES_INCONSISTENT;
+      signals.push('Involved parties are inconsistent across document sections.');
     }
 
-    // Signal: mismo cliente con >MAX_CLAIMS_30_DAYS reclamos en últimos 30 días
+    // Signal: client exceeded recent claim limit in the last 30 days
     if (recentClaimCount > MAX_CLAIMS_30_DAYS) {
-      score += FRAUD_SIGNALS.HISTORIAL_EXCEDIDO;
-      justificacion.push(
-        `Cliente con ${recentClaimCount} reclamos en los últimos 30 días (límite: ${MAX_CLAIMS_30_DAYS}).`,
-      );
+      score += FRAUD_SIGNALS.HISTORY_EXCEEDED;
+      signals.push(`Client has ${recentClaimCount} claims in the last 30 days (limit: ${MAX_CLAIMS_30_DAYS}).`);
     }
 
-    return { score: Math.min(score, 100), justificacion };
+    return { score: Math.min(score, 100), signals };
   },
 
-  /**
-   * Rule: ante la duda, SIEMPRE 'requiere_revision'.
-   * Never confirms coverage without explicit policy backing.
-   */
-  _computeCoverage(
-    tipoSiniestro: string | null,
-    descripcion: string | null,
-  ): CoberturaAplica {
-    // Without extracted tipo or description, the coverage cannot be determined.
-    if (!tipoSiniestro || !descripcion) return 'requiere_revision';
-
-    // Placeholder: real implementation receives the policy text and applies
-    // NLP/AI matching. Until then, default conservatively to requiere_revision.
-    return 'requiere_revision';
+  _computeCoverage(claimType: string | null, description: string | null): Coverage {
+    // Rule: when in doubt, ALWAYS return requires_review.
+    // Real implementation: match claim type + description against policy clauses via AI/NLP.
+    if (!claimType || !description) return 'requires_review';
+    return 'requires_review';
   },
 
-  _computePriority(
-    montoEstimado: number | null,
-    scoreFraude: number,
-    requiereRevision: boolean,
-  ): Prioridad {
-    if (requiereRevision || (montoEstimado !== null && montoEstimado > MONTO_ALTO_THRESHOLD)) {
-      return 'alta';
-    }
-    if (scoreFraude >= 30 && scoreFraude < FRAUD_THRESHOLD) {
-      return 'media';
-    }
-    return 'baja';
+  _computePriority(estimatedAmount: number | null, fraudScore: number, requiresReview: boolean): Priority {
+    if (requiresReview || (estimatedAmount !== null && estimatedAmount > HIGH_AMOUNT_THRESHOLD)) return 'high';
+    if (fraudScore >= 30 && fraudScore < FRAUD_THRESHOLD) return 'medium';
+    return 'low';
   },
 
   async _countRecentClaims(clientId: string): Promise<number> {

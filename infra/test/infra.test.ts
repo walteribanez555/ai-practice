@@ -62,7 +62,7 @@ describe("AssistanceStack", () => {
       GlobalSecondaryIndexes: [
         { IndexName: "clientId-createdAt-index" },
         { IndexName: "status-createdAt-index" },
-        { IndexName: "prioridad-createdAt-index" },
+        { IndexName: "priority-createdAt-index" },
       ],
     });
   });

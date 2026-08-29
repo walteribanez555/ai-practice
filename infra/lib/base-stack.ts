@@ -72,11 +72,11 @@ export class AssistanceStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // GSI 3 — query by prioridad sorted by creation date
-    // Usage: adjuster queue — claims by priority level
+    // GSI 3 — query by priority sorted by creation date
+    // Usage: adjuster queue — claims by priority level (high / medium / low)
     this.claimsTable.addGlobalSecondaryIndex({
-      indexName:    "prioridad-createdAt-index",
-      partitionKey: { name: "prioridad", type: dynamodb.AttributeType.STRING },
+      indexName:    "priority-createdAt-index",
+      partitionKey: { name: "priority",  type: dynamodb.AttributeType.STRING },
       sortKey:      { name: "createdAt", type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
     });

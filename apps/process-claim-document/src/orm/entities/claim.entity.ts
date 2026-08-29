@@ -1,95 +1,136 @@
-import { db } from '../../config/db';
-import type { FindManyOptions } from '../orm';
-import type { ClaimStatus, CoberturaAplica, Prioridad } from '../../modules/claim/claim.types';
+import { randomUUID } from 'crypto';
+import { docClient, CLAIMS_TABLE } from '../../config/dynamo';
+import { DynamoTable } from '../dynamo-table';
+import type { ClaimStatus, Coverage, Priority } from '../../modules/claim/claim.types';
+
+// ── Shape ─────────────────────────────────────────────────────────────────────
 
 export interface Claim extends Record<string, unknown> {
   id: string;
   status: ClaimStatus;
-  client_id: string;
-  policy_id: string | null;
-  document_key: string;
-  content_type: string;
-  file_size_bytes: number;
-  // Extracted — null means the field couldn't be read from the document
-  tipo_siniestro: string | null;
-  monto_estimado: number | null;
-  fecha_incidente: Date | null;
-  partes_involucradas: string[] | null;
-  descripcion_resumen: string | null;
-  // Risk scoring (internal — never exposed to the client)
-  score_riesgo_fraude: number | null;
-  justificacion_riesgo: string | null;
+  // Client info
+  clientId: string;
+  policyId?: string;
+  // Document reference
+  documentKey: string;
+  contentType: string;
+  fileSizeBytes: number;
+  // Extracted fields (absent = could not be read with confidence)
+  claimType?: string;
+  estimatedAmount?: number;
+  incidentDate?: string;        // YYYY-MM-DD
+  involvedParties?: string[];
+  descriptionSummary?: string;
+  // Fraud risk (internal — never exposed to the client)
+  fraudRiskScore?: number;
+  riskJustification?: string;
   // Coverage decision
-  cobertura_aplica: CoberturaAplica | null;
-  // Decisions
-  requiere_revision_humana: boolean;
-  prioridad: Prioridad | null;
-  // Error details (populated when status = 'error')
-  error_razon: string | null;
-  // Timestamps
-  created_at: Date;
-  updated_at: Date;
-  processed_at: Date | null;
+  coverageApplies?: Coverage;
+  // Routing
+  requiresHumanReview: boolean;
+  priority?: Priority;
+  // Error details (populated when status = error)
+  errorReason?: string;
+  // Timestamps (ISO strings — doubles as GSI sort keys)
+  createdAt: string;
+  updatedAt: string;
+  processedAt?: string;
+  // Optional DynamoDB TTL (epoch seconds)
+  ttl?: number;
 }
 
 export type CreateClaimInput = Pick<
   Claim,
-  'client_id' | 'document_key' | 'content_type' | 'file_size_bytes'
-> & Partial<Pick<Claim, 'policy_id'>>;
+  'clientId' | 'documentKey' | 'contentType' | 'fileSizeBytes'
+> & Partial<Pick<Claim, 'policyId'>>;
 
 export type UpdateClaimInput = Partial<
   Pick<
     Claim,
     | 'status'
-    | 'tipo_siniestro'
-    | 'monto_estimado'
-    | 'fecha_incidente'
-    | 'partes_involucradas'
-    | 'descripcion_resumen'
-    | 'score_riesgo_fraude'
-    | 'justificacion_riesgo'
-    | 'cobertura_aplica'
-    | 'requiere_revision_humana'
-    | 'prioridad'
-    | 'error_razon'
-    | 'processed_at'
+    | 'claimType'
+    | 'estimatedAmount'
+    | 'incidentDate'
+    | 'involvedParties'
+    | 'descriptionSummary'
+    | 'fraudRiskScore'
+    | 'riskJustification'
+    | 'coverageApplies'
+    | 'requiresHumanReview'
+    | 'priority'
+    | 'errorReason'
+    | 'processedAt'
+    | 'updatedAt'
   >
 >;
 
-const table = db.table<Claim>('claims');
+// ── Table ─────────────────────────────────────────────────────────────────────
+
+const table = new DynamoTable<Claim>(docClient, CLAIMS_TABLE);
+
+// ── Entity ────────────────────────────────────────────────────────────────────
 
 export const ClaimEntity = {
-  findAll(options?: FindManyOptions) {
-    return table.findMany(options);
+
+  findAll(): Promise<Claim[]> {
+    return table.scan();
   },
 
-  findById(id: string) {
-    return table.findOne({ where: { id } });
+  findById(id: string): Promise<Claim | null> {
+    return table.get(id);
   },
 
-  findByClientId(clientId: string, options?: FindManyOptions) {
-    return table.findMany({ ...options, where: { ...options?.where, client_id: clientId } });
+  findByClientId(clientId: string): Promise<Claim[]> {
+    return table.queryIndex({
+      indexName: 'clientId-createdAt-index',
+      pk: { name: 'clientId', value: clientId },
+    });
   },
 
-  findRecentByClientId(clientId: string, sinceDate: Date) {
-    return db.query<Claim>(
-      `SELECT * FROM "claims"
-       WHERE client_id = $1
-         AND created_at >= $2
-         AND status != 'error'`,
-      [clientId, sinceDate],
-    );
+  findRecentByClientId(clientId: string, since: Date): Promise<Claim[]> {
+    return table.queryIndex({
+      indexName: 'clientId-createdAt-index',
+      pk: { name: 'clientId', value: clientId },
+      sk: { name: 'createdAt', operator: '>=', value: since.toISOString() },
+    });
   },
 
-  create(input: CreateClaimInput) {
-    return table.create({ ...input, status: 'pendiente' });
+  findByStatus(status: ClaimStatus): Promise<Claim[]> {
+    return table.queryIndex({
+      indexName: 'status-createdAt-index',
+      pk: { name: 'status', value: status },
+    });
   },
 
-  update(id: string, input: UpdateClaimInput) {
-    return table.update({ where: { id }, data: { ...input, updated_at: new Date() } });
+  findByPriority(priority: Priority): Promise<Claim[]> {
+    return table.queryIndex({
+      indexName: 'priority-createdAt-index',
+      pk: { name: 'priority', value: priority },
+    });
   },
 
-  delete(id: string) {
-    return table.delete({ where: { id } });
+  create(input: CreateClaimInput): Promise<Claim> {
+    const now  = new Date().toISOString();
+    const item: Claim = {
+      id:                  randomUUID(),
+      status:              'pending',
+      clientId:            input.clientId,
+      documentKey:         input.documentKey,
+      contentType:         input.contentType,
+      fileSizeBytes:       input.fileSizeBytes,
+      requiresHumanReview: false,
+      createdAt:           now,
+      updatedAt:           now,
+      ...(input.policyId ? { policyId: input.policyId } : {}),
+    };
+    return table.put(item);
+  },
+
+  update(id: string, input: UpdateClaimInput): Promise<Claim | null> {
+    return table.update(id, { ...input, updatedAt: new Date().toISOString() });
+  },
+
+  delete(id: string): Promise<boolean> {
+    return table.delete(id);
   },
 };
