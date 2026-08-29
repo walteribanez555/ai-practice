@@ -30,7 +30,7 @@ app.use('*', cors({
 
 app.get('/', (c) => {
   logger.info('Root request');
-  return c.json({ message: 'Hello from serverless' });
+  return c.json({ service: 'claims-api-handler', status: 'ok' });
 });
 
 const v1 = new Hono();
