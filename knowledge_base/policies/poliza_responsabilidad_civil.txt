@@ -1,0 +1,106 @@
+POLIZA DE RESPONSABILIDAD CIVIL — CONDICIONES GENERALES
+Producto: RC Integral | Version: 2026-01
+
+== SECCION 1 — DEFINICIONES ==
+
+Asegurado: persona fisica o juridica cuya responsabilidad civil queda amparada.
+Tercero perjudicado: persona ajena al asegurado que sufre danos por actos u omisiones del asegurado.
+Dano corporal: lesion fisica, enfermedad o muerte causada a un tercero.
+Dano material: deterioro, destruccion o perdida de bienes de un tercero.
+Dano moral: perjuicio psicologico, reputacional o de sufrimiento reconocido por resolucion judicial.
+Hecho generador: acto, omision o evento que origina la responsabilidad del asegurado.
+Franquicia: monto minimo de dano a cargo del asegurado antes de activar la poliza.
+Limite por victima: monto maximo de indemnizacion por persona afectada en un mismo evento.
+Limite por evento: monto maximo total por un mismo hecho generador.
+
+== SECCION 2 — COBERTURAS INCLUIDAS ==
+
+2.1 Responsabilidad Civil General
+Cubre reclamaciones de terceros por danos corporales o materiales causados por el asegurado en el ejercicio de sus actividades personales o profesionales habituales.
+Limite por victima: USD 100,000.
+Limite por evento: USD 500,000.
+Franquicia: USD 500.
+
+2.2 Responsabilidad Civil de Vehiculos a Motor (RC Obligatoria)
+Cubre danos a terceros causados por circulacion del vehiculo asegurado: danos corporales, materiales y lucro cesante del tercero afectado.
+Limite por victima dano corporal: USD 300,000.
+Limite por victima dano material: USD 50,000.
+Limite por evento total: USD 800,000.
+Franquicia: USD 0 para danos corporales; USD 300 para danos materiales.
+Incluye: defensa juridica ante reclamaciones de terceros.
+
+2.3 Responsabilidad Civil Patronal
+Cubre reclamaciones de empleados del asegurado por accidentes de trabajo o enfermedades profesionales ocurridos durante la jornada laboral.
+Limite por empleado: USD 200,000.
+Limite anual: USD 1,000,000.
+Franquicia: USD 1,000.
+Excluye: incumplimiento deliberado de normas de seguridad laboral.
+
+2.4 Responsabilidad Civil de Inmuebles
+Cubre danos a terceros causados por el estado o mantenimiento de inmuebles del asegurado (goteras que afectan vecinos, caidas en zonas comunes, desprendimientos).
+Limite por evento: USD 200,000.
+Franquicia: USD 400.
+
+2.5 Responsabilidad Civil de Productos
+Cubre reclamaciones por danos causados por productos fabricados, distribuidos o vendidos por el asegurado.
+Limite por victima: USD 150,000.
+Limite anual: USD 2,000,000.
+Franquicia: USD 2,000.
+Aplica a: fabricantes, importadores, distribuidores y comercializadores.
+
+2.6 Defensa Juridica
+Cubre honorarios de abogado, costas judiciales y gastos de peritos designados por la aseguradora para la defensa del asegurado.
+Limite anual: USD 50,000.
+La aseguradora designa el letrado; el asegurado puede proponer el suyo con aprobacion previa.
+
+== SECCION 3 — COBERTURAS OPCIONALES ==
+
+3.1 RC Cruzada entre Coasegurados
+Cubre danos que un asegurado cause a otro asegurado incluido en la misma poliza (util para empresas con multiples departamentos).
+
+3.2 RC de Directores y Funcionarios (D&O)
+Cubre reclamaciones contra directivos de empresas por decisiones tomadas en el ejercicio de sus funciones.
+Limite: USD 500,000.
+
+3.3 RC Medioambiental
+Cubre costos de descontaminacion y reclamaciones por danos al medio ambiente causados por la actividad del asegurado.
+Limite por evento: USD 300,000.
+
+== SECCION 4 — EXCLUSIONES ==
+
+4.1 Danos causados de forma dolosa o intencional por el asegurado.
+4.2 Multas, sanciones administrativas o penales impuestas al asegurado.
+4.3 Reclamaciones entre familiares directos convivientes con el asegurado.
+4.4 Danos causados por guerra, terrorismo, huelga o disturbio civil.
+4.5 Responsabilidad asumida voluntariamente por el asegurado mediante contrato que supere la responsabilidad legal ordinaria.
+4.6 Danos por contaminacion gradual o deliberada al medio ambiente (sin endoso RC Medioambiental).
+4.7 Danos a bienes propios del asegurado o bajo su custodia legal.
+4.8 Danos derivados de actividades nucleares.
+4.9 Reclamaciones por danos esteticos o embellecimiento sin correlacion con dano funcional.
+4.10 Hechos ocurridos antes de la fecha de inicio de la poliza (principio de retroactividad no incluido salvo endoso).
+
+== SECCION 5 — PROCEDIMIENTO DE RECLAMO ==
+
+5.1 El asegurado debe notificar a la aseguradora dentro de las 48 horas de recibir cualquier reclamacion de un tercero, citacion judicial o conocimiento de un hecho que pueda derivar en responsabilidad.
+
+5.2 El asegurado NO debe reconocer responsabilidad ni realizar pagos al tercero sin autorizacion previa de la aseguradora.
+
+5.3 Documentos requeridos:
+   - Descripcion detallada del hecho generador.
+   - Identificacion del tercero reclamante.
+   - Presupuesto o valoracion de danos.
+   - Informe policial si hay lesionados o danos superiores a USD 5,000.
+   - Cualquier comunicacion recibida del tercero o de su abogado.
+
+5.4 La aseguradora puede optar por reparar, reemplazar o indemnizar en dinero los danos materiales.
+
+== SECCION 6 — LIMITES GLOBALES ANUALES ==
+
+Limite maximo global de la poliza: USD 3,000,000 anuales por todos los conceptos combinados.
+Una vez agotado el limite global, la poliza no cubre nuevos eventos en ese periodo anual.
+
+== SECCION 7 — TERRITORIO ==
+
+Cobertura valida en: Estados Unidos, Canada, Mexico y Puerto Rico.
+RC de Productos: cobertura mundial para productos exportados desde territorio cubierto.
+RC de Vehiculos: valida en pais de registro y paises con convenio de carta verde (segun endoso).

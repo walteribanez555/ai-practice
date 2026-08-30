@@ -1,0 +1,105 @@
+POLIZA DE SEGURO CONTRA ROBO Y HURTO — CONDICIONES GENERALES
+Producto: ProteccionTotal | Version: 2026-01
+
+== SECCION 1 — DEFINICIONES ==
+
+Asegurado: persona titular del bien registrado en la poliza.
+Robo: sustraccion de bienes mediante violencia, fuerza o amenaza contra personas.
+Hurto: sustraccion de bienes sin violencia ni fuerza directa contra personas.
+Bien asegurado: objeto, vehiculo, propiedad o contenido declarado en la poliza.
+Valor asegurado: monto maximo de indemnizacion pactado al momento de contratar.
+Deducible: monto a cargo del asegurado antes de activar la cobertura.
+Denuncia policial: reporte formal ante autoridad competente dentro de las 24 horas del hecho.
+
+== SECCION 2 — COBERTURAS INCLUIDAS ==
+
+2.1 Robo con Violencia
+Cubre sustraccion de bienes asegurados cuando el asegurado o un tercero autorizado sufre amenaza, agresion fisica o intimidacion con arma.
+Limite: hasta el valor asegurado declarado.
+Deducible: USD 200 o 5% del valor del siniestro, el mayor.
+Requisito: denuncia policial obligatoria dentro de 24 horas.
+
+2.2 Robo con Fuerza en Inmueble
+Cubre sustraccion de bienes dentro del domicilio o establecimiento asegurado cuando hay evidencia de fractura, escalamiento o uso de llaves falsas.
+Limite: USD 25,000 por evento.
+Deducible: USD 300 o 8% del valor del siniestro, el mayor.
+Requisito: peritaje policial y fotos del punto de ingreso forzado.
+
+2.3 Hurto de Vehiculo Completo
+Cubre la sustraccion total del vehiculo registrado en la poliza.
+Limite: valor de mercado del vehiculo al momento del robo.
+Deducible: USD 500.
+Plazo de espera: si el vehiculo no aparece en 30 dias desde la denuncia, se procede a indemnizacion.
+Requisito: denuncia policial, titulo de propiedad y llaves originales del vehiculo.
+
+2.4 Robo de Accesorios y Equipos en Vehiculo
+Cubre sustraccion de equipos de fabrica, sistemas de audio, GPS y accesorios instalados.
+Limite: USD 3,000 por evento.
+Deducible: USD 150.
+Excluye: accesorios no originales de fabrica no declarados previamente.
+
+2.5 Robo de Documentos y Tarjetas
+Cubre gastos de reposicion de documentos de identidad, licencia de conducir, tarjetas bancarias y llaves robadas.
+Limite: USD 500.
+Deducible: USD 0.
+Cubre: tramites notariales, reposicion de documentos, bloqueo y reposicion de tarjetas.
+
+2.6 Hurto en Establecimientos Comerciales
+Cubre sustraccion de mercancia, caja registradora o equipos de trabajo en locales comerciales asegurados.
+Limite: USD 15,000 por evento.
+Deducible: 10% del valor del siniestro, minimo USD 400.
+Requisito: sistema de camara de seguridad activo al momento del hecho.
+
+== SECCION 3 — COBERTURAS ADICIONALES (CONTRATACION OPCIONAL) ==
+
+3.1 Robo en Transito
+Cubre bienes asegurados mientras son transportados dentro del territorio nacional.
+Prima adicional: 0.8% del valor asegurado anual.
+Limite: USD 10,000.
+
+3.2 Cobertura Ampliada a Familiares
+Extiende la cobertura de robo con violencia a conyugue e hijos que residan en el domicilio asegurado.
+Prima adicional: USD 80 anuales por persona adicional.
+
+== SECCION 4 — EXCLUSIONES ==
+
+Las siguientes situaciones NO estan cubiertas:
+
+4.1 Hurto sin evidencia fisica de sustraccion forzada o violencia comprobable.
+4.2 Sustraccion por persona que conviva con el asegurado o empleado de confianza (robo entre convivientes).
+4.3 Perdidas por descuido, olvido o extravio involuntario no relacionado con un acto delictivo.
+4.4 Bienes no declarados en la poliza al momento de contratar.
+4.5 Joyas, obras de arte, dinero en efectivo o metales preciosos, salvo declaracion expresa y prima adicional.
+4.6 Robo cometido por el propio asegurado o con su complicidad.
+4.7 Perdidas ocurridas fuera del territorio cubierto por la poliza (ver Zonas de Cobertura).
+4.8 Robo de vehiculos sin sistema de rastreo GPS cuando el valor supera USD 20,000.
+4.9 Accesorios no originales no declarados previamente.
+4.10 Siniestros reportados fuera del plazo de 72 horas desde que el asegurado tuvo conocimiento del hecho.
+
+== SECCION 5 — PROCESO DE RECLAMO ==
+
+5.1 Pasos obligatorios:
+   a) Denuncia policial dentro de las 24 horas del hecho.
+   b) Notificacion a la aseguradora dentro de las 48 horas.
+   c) Presentar inventario de bienes robados con valoracion.
+   d) Cooperar con el perito designado por la aseguradora.
+
+5.2 Documentos requeridos:
+   - Copia de la denuncia policial.
+   - Fotos del lugar del hecho y evidencias.
+   - Facturas o prueba de propiedad de bienes reclamados.
+   - Declaracion jurada del asegurado.
+
+5.3 Plazo de resolucion: 30 dias habiles desde recepcion de documentacion completa.
+
+== SECCION 6 — LIMITES GLOBALES ==
+
+6.1 Limite maximo por evento: USD 50,000.
+6.2 Limite maximo por poliza anual: USD 100,000.
+6.3 Acumulacion: dos o mas eventos en el mismo domicilio en 12 meses se consideran acumulacion y aplica deducible adicional del 15%.
+
+== SECCION 7 — TERRITORIO ==
+
+Cobertura valida en: Estados Unidos, Canada, Mexico.
+Cobertura en transito internacional: requiere endoso adicional.
+Excluido: zonas declaradas en estado de emergencia o conflicto armado al momento del siniestro.

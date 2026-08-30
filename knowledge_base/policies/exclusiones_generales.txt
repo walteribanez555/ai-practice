@@ -1,0 +1,125 @@
+EXCLUSIONES GENERALES — CONDICIONES APLICABLES A TODAS LAS POLIZAS
+Documento consolidado | Version: 2026-01
+
+Las siguientes exclusiones aplican a TODOS los productos de seguro ofrecidos por la compania,
+independientemente del tipo de poliza contratada. Exclusiones especificas de cada producto
+se detallan en sus condiciones particulares.
+
+== SECCION 1 — EXCLUSIONES POR CAUSA DEL SINIESTRO ==
+
+1.1 Dolo e Intencionalidad
+No se cubre ningun siniestro causado intencionalmente por el asegurado, beneficiario, o
+cualquier persona que actue en nombre o con conocimiento del asegurado.
+Incluye: incendio provocado, autoflagelacion, accidentes simulados, fraude en la declaracion.
+
+1.2 Actos Delictivos del Asegurado
+Siniestros ocurridos mientras el asegurado participa en la comision de un delito, fuga de la
+autoridad, o actividad ilicita comprobada, quedan excluidos de cobertura.
+
+1.3 Estado de Embriaguez o Intoxicacion
+No se cubre siniestros ocurridos cuando el asegurado opera vehiculos, maquinaria o realiza
+actividades de riesgo con alcoholemia superior a 0.8 g/L o bajo efecto de drogas no prescritas
+por medico autorizado.
+
+1.4 Conflicto Armado y Guerra
+Quedan excluidos siniestros causados directa o indirectamente por: guerra declarada o no
+declarada, invasion, actos de enemigo extranjero, hostilidades, guerrilla, insurrección,
+revolucion, motín militar, o usurpacion de poder.
+
+1.5 Terrorismo
+Actos de terrorismo, sabotaje y sus consecuencias directas quedan excluidos, salvo que se
+haya contratado endoso especifico de cobertura antiterrorista.
+
+1.6 Energia Nuclear y Radiacion
+No se cubren danos causados por energia nuclear, radiation ionizante, contaminacion
+radioactiva, o reaccion nuclear, sea accidental o no.
+
+1.7 Desastres Declarados por el Gobierno
+Siniestros en zonas declaradas oficialmente en estado de emergencia nacional, catastrofe
+o zona de exclusion por autoridad competente al momento del evento quedan sujetos a
+evaluacion especial y pueden excluirse parcial o totalmente.
+
+== SECCION 2 — EXCLUSIONES POR CONDICION DEL ASEGURADO ==
+
+2.1 Preexistencias No Declaradas
+Enfermedades, condiciones medicas, siniestros previos o danos preexistentes que el asegurado
+conocia y no declaro al momento de contratar la poliza.
+La omision deliberada invalida la poliza completa para ese riesgo especifico.
+
+2.2 Informacion Falsa o Incompleta en la Solicitud
+Cualquier declaracion falsa, incompleta o tendenciosa en la solicitud de seguro puede
+resultar en la nulidad de la poliza y la negativa de cualquier reclamo.
+
+2.3 Incumplimiento de Obligaciones del Asegurado
+El asegurado pierde el derecho a indemnizacion si:
+   a) No notifica el siniestro dentro de los plazos establecidos.
+   b) No coopera con la investigacion del perito designado.
+   c) Altera, destruye o mueve evidencias antes de la inspeccion.
+   d) Realiza reparaciones sin autorizacion previa de la aseguradora cuando el dano supera USD 1,000.
+
+== SECCION 3 — EXCLUSIONES POR TIPO DE BIEN O ACTIVIDAD ==
+
+3.1 Bienes No Asegurados o No Declarados
+Solo se indemnizan bienes expresamente incluidos en la poliza. Bienes adquiridos despues de
+la contratacion deben notificarse para su inclusion; de lo contrario quedan excluidos.
+
+3.2 Dinero en Efectivo, Titulos y Valores
+El dinero en efectivo, criptomonedas, cheques, bonos, acciones y documentos al portador
+no estan cubiertos salvo declaracion expresa y prima adicional.
+
+3.3 Joyas, Arte y Colecciones
+Joyas, obras de arte, colecciones de valor (sellos, monedas, vinos, relojes) requieren
+declaracion de valor certificada y prima adicional. Sin este endoso, el limite de cobertura
+es USD 2,000 por evento para la categoria completa.
+
+3.4 Animales y Mascotas
+No cubiertos salvo poliza especifica de animales de compania o ganado.
+
+3.5 Vehículos No Registrados o Sin Licencia
+Vehiculos sin placa vigente, sin seguro obligatorio (RC) activo, o conducidos por persona
+sin licencia valida al momento del siniestro quedan excluidos.
+
+3.6 Actividades de Alto Riesgo No Declaradas
+Las siguientes actividades solo estan cubiertas si se declaran al contratar y se paga prima adicional:
+   - Paracaidismo, ala delta, paramotor.
+   - Alpinismo a mas de 4,000 metros de altitud.
+   - Carreras de velocidad o competencias motorsport.
+   - Buceo a mas de 40 metros de profundidad.
+   - Trabajos en altura (construccion, torres) como actividad profesional habitual.
+
+3.7 Uso Comercial No Declarado
+Si el bien asegurado (vehiculo, inmueble, equipo) se usa con fines comerciales sin haberlo
+declarado en la poliza, los siniestros derivados de ese uso quedan excluidos.
+
+== SECCION 4 — EXCLUSIONES TEMPORALES Y GEOGRAFICAS ==
+
+4.1 Periodo de Carencia
+Durante el periodo inicial de vigencia indicado en cada cobertura, los siniestros por causas
+no accidentales quedan excluidos. Los accidentes no tienen carencia salvo indicacion contraria.
+
+4.2 Fuera del Territorio Cubierto
+Siniestros ocurridos fuera del territorio definido en cada poliza no estan cubiertos salvo
+endoso de cobertura internacional contratado previamente.
+
+4.3 Poliza Vencida o Suspendida por Falta de Pago
+Si la prima no fue pagada en la fecha de vencimiento, la cobertura queda suspendida
+automaticamente. Los siniestros ocurridos durante la suspension no son indemnizables, incluso
+si el pago se regulariza posteriormente.
+
+== SECCION 5 — BIENES Y SITUACIONES CON SUBLIMITES REDUCIDOS ==
+
+Aunque estas situaciones tienen alguna cobertura, aplican limites reducidos:
+- Danos esteticos sin dano funcional: maximo USD 500.
+- Danos por desgaste, corrosion u obsolescencia natural: no cubiertos.
+- Perdidas de beneficios economicos indirectos (lucro cesante): solo cubiertos con endoso especifico.
+- Danos causados por plagas, insectos o roedores: no cubiertos.
+- Filtraciones lentas o humedades cronicas (no reventones subitos): no cubiertos.
+
+== SECCION 6 — NOTA SOBRE FRAUDE ==
+
+6.1 La aseguradora se reserva el derecho de investigar cualquier siniestro.
+6.2 Si se comprueba fraude o exageracion deliberada del siniestro, se aplicara:
+   a) Negativa total de la indemnizacion.
+   b) Cancelacion inmediata de la poliza sin derecho a devolucion de prima.
+   c) Reporte a autoridades competentes y a bases de datos de fraude del sector asegurador.
+6.3 La denuncia de siniestros fraudulentos por terceros es recompensada con hasta USD 2,000.

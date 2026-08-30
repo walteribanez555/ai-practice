@@ -1,0 +1,129 @@
+PROCEDIMIENTO DE RECLAMO — GUIA OPERATIVA
+Documento de referencia | Version: 2026-01
+
+Este documento describe los pasos, plazos y requisitos para presentar y tramitar
+un reclamo ante la aseguradora, aplicable a todos los tipos de poliza.
+
+== SECCION 1 — PASOS INMEDIATOS TRAS EL SINIESTRO ==
+
+1.1 Primeras 24 horas (acciones del asegurado):
+
+   PASO 1 — Garantizar la seguridad
+   Antes que cualquier otra accion, asegurar la integridad fisica de las personas.
+   Llamar a servicios de emergencia si hay lesionados (911).
+
+   PASO 2 — Preservar evidencias
+   No mover ni modificar el escenario del siniestro hasta que el perito haya inspeccionado,
+   salvo que sea necesario por seguridad. Tomar fotografias y videos del estado original.
+
+   PASO 3 — Denuncia policial (cuando aplica)
+   Obligatoria para: robo, hurto, accidentes de transito con terceros, incendio intencional,
+   vandalismo, y cualquier evento donde haya terceros involucrados.
+   Plazo maximo: 24 horas desde el hecho.
+
+   PASO 4 — Notificar a la aseguradora
+   Contactar al numero de atencion 24/7: 1-800-ASEGURA (1-800-273-4872).
+   O abrir el reclamo en la plataforma digital con el numero de poliza.
+   Plazo maximo: 48 horas desde el siniestro o desde que el asegurado tomo conocimiento.
+
+1.2 Informacion minima para la notificacion inicial:
+   - Numero de poliza.
+   - Fecha, hora y lugar del siniestro.
+   - Descripcion breve del hecho.
+   - Datos de terceros involucrados (si aplica).
+   - Estado actual del bien asegurado.
+
+== SECCION 2 — DOCUMENTACION REQUERIDA POR TIPO DE SINIESTRO ==
+
+2.1 Accidente de Transito:
+   - Informe policial del accidente.
+   - Fotografias del vehiculo y del lugar.
+   - Datos completos de todos los vehiculos y conductores involucrados.
+   - Presupuesto de reparacion de taller autorizado.
+   - Copia de licencia de conducir vigente del conductor.
+   - Copia de la tarjeta de circulacion del vehiculo.
+   - Facturas medicas si hay lesionados (propios o terceros).
+
+2.2 Siniestro de Hogar (incendio, inundacion, explosion):
+   - Informe de bomberos o autoridad competente si intervino.
+   - Fotografias del inmueble antes y despues (si se tienen del estado previo).
+   - Inventario detallado de bienes danados o perdidos con valoracion.
+   - Presupuesto de reparacion de contratista habilitado.
+   - Declaracion jurada del asegurado describiendo el evento.
+   - Informe de la empresa de servicios si el dano fue por fuga de gas, cortocircuito, etc.
+
+2.3 Robo o Hurto:
+   - Copia de denuncia policial (obligatoria).
+   - Inventario de bienes sustraidos con valoracion y facturas de compra si se tienen.
+   - Fotografias del lugar del hecho y evidencias de acceso forzado.
+   - Declaracion de testigos si los hay.
+   - En caso de robo de vehiculo: titulo de propiedad, llaves originales entregadas a la aseguradora.
+
+2.4 Siniestro de Salud:
+   - Historia clinica del evento (diagnostico, tratamiento, alta medica).
+   - Facturas originales de hospital, clinica, farmacia y medicos tratantes.
+   - Ordenes medicas que justifiquen cada gasto.
+   - Informe medico de alta con diagnostico final y codigo CIE-10.
+   - En caso de internacion: resumen de epicrisis.
+
+2.5 Siniestro de Vida (fallecimiento):
+   - Acta de defuncion original o copia certificada.
+   - Certificado medico de causa de muerte.
+   - Documentos de identidad del asegurado y todos los beneficiarios.
+   - Si fue accidente: informe policial y/o informe forense.
+   - Declaracion de beneficiarios indicando datos bancarios para transferencia.
+
+2.6 Responsabilidad Civil (reclamacion de tercero):
+   - Notificacion de la reclamacion recibida del tercero o de su abogado.
+   - Descripcion del hecho que origino la reclamacion.
+   - Datos del tercero reclamante.
+   - Presupuesto o valoracion del dano reclamado.
+   - Cualquier documentacion judicial si ya se inicio proceso legal.
+   IMPORTANTE: no reconocer responsabilidad ni realizar pagos al tercero sin autorizacion previa.
+
+== SECCION 3 — PLAZOS DEL PROCESO ==
+
+| Etapa                                   | Plazo                              |
+|-----------------------------------------|------------------------------------|
+| Notificacion del siniestro              | 48 horas desde el evento           |
+| Asignacion de perito                    | 24 horas desde la notificacion     |
+| Primera inspeccion del perito           | 3 dias habiles                     |
+| Solicitud de documentacion adicional    | Dentro de 5 dias habiles           |
+| Entrega de documentacion completa       | 15 dias habiles desde la solicitud |
+| Resolucion del reclamo (simple)         | 15 dias habiles tras documentacion completa |
+| Resolucion del reclamo (complejo)       | 30 dias habiles tras documentacion completa |
+| Pago de la indemnizacion aprobada       | 5 dias habiles tras aprobacion     |
+| Pago urgente gastos medicos             | 72 horas en casos de hospitalizacion activa |
+| Pago sepelio (anticipado)              | 72 horas desde notificacion        |
+
+== SECCION 4 — ESTADOS DEL RECLAMO ==
+
+PENDIENTE: reclamo registrado, esperando documentacion o inspeccion.
+EN REVISION: perito asignado, documentacion en analisis.
+APROBADO PARCIAL: se aprueba parte del reclamo; se notifica al asegurado con justificacion.
+APROBADO TOTAL: monto total aprobado; se procede al pago.
+RECHAZADO: reclamo no procede por exclusion, fraude o incumplimiento; se notifica con fundamento.
+EN APELACION: asegurado impugna la decision; se activa proceso de revision por segunda instancia interna.
+
+== SECCION 5 — DERECHOS DEL ASEGURADO ==
+
+5.1 Derecho a conocer el estado de su reclamo en cualquier momento.
+5.2 Derecho a recibir explicacion escrita y fundada en caso de rechazo total o parcial.
+5.3 Derecho a apelar la decision dentro de los 15 dias habiles de recibida la notificacion.
+5.4 Derecho a designar un abogado o mediador propio en caso de disputa (costo a cargo del asegurado).
+5.5 Derecho a acudir al Comisionado de Seguros del estado si el proceso supera los plazos legales.
+5.6 Derecho a un adelanto del 50% de la indemnizacion estimada en siniestros de hogar que dejen al asegurado sin vivienda habitable.
+
+== SECCION 6 — CANALES DE CONTACTO ==
+
+Linea de emergencias 24/7:    1-800-ASEGURA (1-800-273-4872)
+Portal de reclamos online:    claims.assistance.com
+Email de documentacion:       reclamos@assistance.com
+App movil:                    Assistance Claims (iOS y Android)
+Oficinas fisicas:             Ver directorio en website oficial
+
+Atribuciones del perito asignado:
+- Inspeccionar el bien siniestrado.
+- Solicitar documentacion adicional.
+- Emitir dictamen tecnico vinculante para la resolucion.
+- Coordinar reparaciones con talleres o contratistas autorizados.

@@ -1,0 +1,107 @@
+TABLA DE DEDUCIBLES Y FRANQUICIAS — REFERENCIA CONSOLIDADA
+Documento de referencia interna | Version: 2026-01
+
+Esta tabla consolida los deducibles aplicables a cada tipo de cobertura y siniestro.
+El deducible es el monto a cargo del asegurado que se descuenta de la indemnizacion total.
+Cuando se indican dos valores, aplica el MAYOR de los dos.
+
+== SECCION 1 — DEDUCIBLES POR TIPO DE POLIZA ==
+
+--- SEGURO AUTOMOTRIZ ---
+
+| Cobertura                         | Deducible Estandar        | Deducible Ampliado       |
+|-----------------------------------|---------------------------|--------------------------|
+| Colision propia                   | USD 500 o 10%             | USD 300 o 7%             |
+| Colision con tercero (RC)         | USD 0 (dano corporal)     | USD 0                    |
+|                                   | USD 300 (dano material)   | USD 0                    |
+| Robo total del vehiculo           | USD 500                   | USD 250                  |
+| Robo de accesorios                | USD 150                   | USD 75                   |
+| Dano por fenomeno natural         | USD 300 o 5%              | USD 150 o 3%             |
+| Incendio del vehiculo             | USD 400 o 8%              | USD 200 o 5%             |
+| Dano por vandalismo               | USD 200                   | USD 100                  |
+| Vidrios y parabrisas              | USD 0 (cobertura directa) | USD 0                    |
+| Asistencia en carretera           | USD 0                     | USD 0                    |
+
+--- SEGURO DE HOGAR ---
+
+| Cobertura                         | Deducible Estandar        | Deducible Ampliado       |
+|-----------------------------------|---------------------------|--------------------------|
+| Incendio estructura               | USD 1,000 o 5%            | USD 500 o 3%             |
+| Incendio contenido                | USD 500 o 5%              | USD 300 o 3%             |
+| Inundacion                        | USD 2,000 o 10%           | USD 1,000 o 7%           |
+| Terremoto / sismo                 | USD 5,000 o 15%           | USD 2,500 o 10%          |
+| Robo con violencia                | USD 300 o 8%              | USD 150 o 5%             |
+| Robo con fuerza en inmueble       | USD 400 o 10%             | USD 200 o 7%             |
+| Dano por agua (tuberia)           | USD 500 o 5%              | USD 300 o 3%             |
+| Responsabilidad civil inmueble    | USD 400                   | USD 200                  |
+| Dano electrico en equipos         | USD 200                   | USD 100                  |
+| Vidrios y cristales               | USD 100                   | USD 0                    |
+
+--- SEGURO DE SALUD ---
+
+| Cobertura                         | Deducible Anual Estandar  | Deducible Anual Reducido |
+|-----------------------------------|---------------------------|--------------------------|
+| Hospitalizacion general           | USD 500                   | USD 250                  |
+| Cirugia electiva                  | USD 1,000                 | USD 500                  |
+| Cirugia de emergencia             | USD 300                   | USD 150                  |
+| Consultas ambulatorias            | USD 20 por visita         | USD 10 por visita        |
+| Medicamentos recetados            | 20% del valor             | 10% del valor            |
+| Estudios diagnosticos             | USD 50 por estudio        | USD 25 por estudio       |
+| Maternidad                        | USD 1,500                 | USD 750                  |
+| Rehabilitacion / fisioterapia     | USD 30 por sesion         | USD 15 por sesion        |
+| Salud mental                      | USD 30 por sesion         | USD 15 por sesion        |
+| Tratamiento oncologico            | USD 0 (sin deducible)     | USD 0                    |
+
+--- SEGURO CONTRA ROBO ---
+
+| Cobertura                         | Deducible Estandar        |
+|-----------------------------------|---------------------------|
+| Robo con violencia                | USD 200 o 5%              |
+| Robo con fuerza en inmueble       | USD 300 o 8%              |
+| Hurto vehiculo completo           | USD 500                   |
+| Robo de accesorios vehiculo       | USD 150                   |
+| Robo documentos y tarjetas        | USD 0                     |
+| Hurto en establecimiento          | USD 400 o 10%             |
+
+--- RESPONSABILIDAD CIVIL ---
+
+| Cobertura                         | Franquicia                |
+|-----------------------------------|---------------------------|
+| RC General personas               | USD 500                   |
+| RC Vehiculo dano corporal         | USD 0                     |
+| RC Vehiculo dano material         | USD 300                   |
+| RC Patronal                       | USD 1,000                 |
+| RC Inmuebles                      | USD 400                   |
+| RC Productos                      | USD 2,000                 |
+
+--- SEGURO DE VIDA ---
+
+| Cobertura                         | Deducible / Carencia      |
+|-----------------------------------|---------------------------|
+| Fallecimiento natural             | Sin deducible (carencia 30 dias) |
+| Fallecimiento accidental          | Sin deducible, sin carencia |
+| ITP (invalidez total permanente)  | Sin deducible (carencia 6 meses) |
+| Enfermedades criticas             | Sin deducible (carencia 90 dias) |
+| Gastos de sepelio                 | USD 0                     |
+
+== SECCION 2 — REGLAS GENERALES DE APLICACION ==
+
+2.1 Multiples eventos en el mismo siniestro: se aplica un solo deducible, el mayor correspondiente.
+2.2 Siniestros recurrentes en el mismo domicilio o vehiculo: a partir del tercer evento en 12 meses, el deducible aumenta un 25%.
+2.3 Deducible acumulado anual: en polizas de salud, una vez alcanzado el deducible anual, los siguientes eventos en el mismo ano no generan deducible adicional.
+2.4 Ajuste por antiguedad del bien: vehiculos con mas de 10 anos o inmuebles con mas de 30 anos tienen un recargo del 15% sobre el deducible estandar.
+2.5 Deducible en caso de siniestro parcial vs. total: en perdida total (dano superior al 70% del valor asegurado) no aplica deducible adicional al ya establecido en contrato.
+
+== SECCION 3 — DEDUCIBLES REDUCIDOS (BENEFICIOS POR FIDELIDAD) ==
+
+Clientes con mas de 3 anos sin siniestros:    -20% sobre deducible estandar.
+Clientes con mas de 5 anos sin siniestros:    -35% sobre deducible estandar.
+Clientes con mas de 10 anos sin siniestros:   -50% sobre deducible estandar (minimo USD 100).
+Polizas con domiciliacion bancaria activa:    -5% adicional.
+Polizas con mas de 2 productos contratados:   -10% adicional (no acumulable con otros descuentos).
+
+== SECCION 4 — MONEDAS Y AJUSTE ==
+
+Todos los montos expresados en dolares americanos (USD).
+Los deducibles en porcentaje se calculan sobre el valor total del siniestro (no sobre la suma asegurada).
+Ajuste anual: los montos fijos se actualizan cada enero segun el IPC publicado por el BLS.

@@ -1,0 +1,99 @@
+POLIZA DE SEGURO DE VIDA — CONDICIONES GENERALES
+Producto: VidaSegura Plus | Version: 2026-01
+
+== SECCION 1 — DEFINICIONES ==
+
+Asegurado: persona cuya vida esta cubierta por la poliza.
+Beneficiario: persona designada para recibir la indemnizacion en caso de siniestro.
+Suma asegurada: monto total de indemnizacion pactado en la poliza.
+Periodo de carencia: plazo inicial desde la contratacion durante el cual ciertas coberturas no aplican.
+Fallecimiento natural: muerte por enfermedad o causas no accidentales.
+Fallecimiento accidental: muerte como consecuencia directa e inmediata de un accidente.
+Invalidez total y permanente (ITP): incapacidad fisica o mental que impide al asegurado realizar cualquier actividad remunerada de forma definitiva.
+Enfermedad critica: diagnostico confirmado de cancer, infarto, accidente cerebrovascular, insuficiencia renal o trasplante de organo mayor.
+
+== SECCION 2 — COBERTURAS INCLUIDAS ==
+
+2.1 Fallecimiento por Cualquier Causa
+Cubre el fallecimiento del asegurado por causas naturales o accidentales ocurrido durante la vigencia de la poliza.
+Suma asegurada: segun contrato, minimo USD 50,000.
+Beneficiarios: designados por el asegurado; si no hay designacion, hereda en orden legal.
+Periodo de carencia: 30 dias para causas naturales. Sin carencia para accidentes.
+Exclusion: suicidio en los primeros 24 meses de vigencia.
+
+2.2 Fallecimiento Accidental (Doble Indemnizacion)
+En caso de muerte por accidente comprobado, se paga el doble de la suma asegurada base.
+Accidente valido: evento subito, externo, fortuito e involuntario que cause la muerte de forma directa.
+Plazo de causalidad: la muerte debe ocurrir dentro de los 180 dias desde el accidente.
+Limite adicional: USD 500,000 maximo por doble indemnizacion.
+
+2.3 Invalidez Total y Permanente
+En caso de ITP certificada por medico especialista y ratificada por el medico de la aseguradora:
+- Se paga el 100% de la suma asegurada en vida.
+- La poliza queda extinguida tras el pago.
+Periodo de carencia: 6 meses desde inicio de la poliza.
+Documentacion: certificado medico, historial clinico completo, dictamen de incapacidad laboral.
+
+2.4 Enfermedades Criticas
+Al diagnostico confirmado de cancer maligno, infarto agudo de miocardio, accidente cerebrovascular con secuelas, insuficiencia renal cronica estadio 5, o trasplante de organo mayor:
+- Pago anticipado del 30% de la suma asegurada (adelanto sobre el beneficio de fallecimiento).
+- La suma asegurada se reduce en el monto adelantado.
+Periodo de carencia: 90 dias.
+Exclusion: condiciones diagnosticadas antes de la contratacion (preexistencias declaradas).
+
+2.5 Gastos de Sepelio
+Cubre gastos funerarios del asegurado.
+Limite: USD 8,000.
+Pago: dentro de 72 horas desde la notificacion, sin necesidad de dictamen de causa de muerte.
+Beneficiario del sepelio: quien demuestre haber sufragado los gastos.
+
+== SECCION 3 — COBERTURAS OPCIONALES ==
+
+3.1 Renta por Hospitalizacion
+USD 100 por dia de hospitalizacion mayor a 48 horas, hasta 90 dias por evento.
+Prima adicional: USD 15 mensuales.
+
+3.2 Cobertura de Conyugue
+Suma asegurada: 50% de la suma base del titular.
+Prima adicional: segun edad del conyugue al momento de inclusion.
+
+3.3 Seguro Educativo para Hijos
+En caso de fallecimiento del titular, pago de mensualidades educativas para hijos menores de 25 anos.
+Monto: USD 500 mensuales por hijo, hasta terminar estudios universitarios o cumplir 25 anos.
+
+== SECCION 4 — EXCLUSIONES ==
+
+4.1 Suicidio o intento de suicidio dentro de los primeros 24 meses de vigencia.
+4.2 Muerte como consecuencia directa de actividades ilicitas o en estado de intoxicacion alcoholica (alcoholemia superior a 0.8 g/L) o bajo efecto de drogas no prescritas.
+4.3 Guerra declarada, conflicto armado internacional o participacion voluntaria en combate.
+4.4 Enfermedades preexistentes no declaradas al momento de la contratacion que sean causa directa del fallecimiento.
+4.5 Muerte por radiacion nuclear o contaminacion quimica masiva.
+4.6 Actividades de alto riesgo no declaradas: paracaidismo, alpinismo extremo, carreras de velocidad, buceo a mas de 40 metros.
+4.7 Fallecimiento ocurrido fuera del periodo de vigencia de la poliza.
+
+== SECCION 5 — PROCESO DE RECLAMO ==
+
+5.1 Documentos requeridos por fallecimiento:
+   - Acta de defuncion original.
+   - Certificado medico con causa de muerte.
+   - Documentos de identidad del asegurado y beneficiarios.
+   - En caso de accidente: informe policial y/o forense.
+
+5.2 Documentos requeridos por ITP:
+   - Certificados medicos de al menos dos especialistas.
+   - Historial clinico completo de los ultimos 12 meses.
+   - Dictamen de invalidez de organismo oficial (SSDI u equivalente).
+
+5.3 Plazo de pago: 15 dias habiles desde la recepcion de documentacion completa para fallecimiento. 30 dias para ITP y enfermedades criticas.
+
+== SECCION 6 — RENOVACION Y VIGENCIA ==
+
+6.1 La poliza se renueva anualmente de forma automatica salvo aviso de cancelacion con 30 dias de anticipacion.
+6.2 La prima puede ajustarse por edad del asegurado en cada renovacion anual.
+6.3 Edad maxima de contratacion: 70 anos. Edad maxima de cobertura: 80 anos.
+6.4 En polizas contratadas antes de los 60 anos, la cobertura por fallecimiento natural se mantiene hasta los 80 anos sin nuevos examenes medicos.
+
+== SECCION 7 — TERRITORIO ==
+
+Cobertura valida en todo el mundo, sin restriccion geografica, para fallecimiento natural y accidental.
+Actividades de alto riesgo en el extranjero: requieren endoso de cobertura internacional de riesgo elevado.
