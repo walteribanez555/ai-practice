@@ -8,12 +8,17 @@ import {
 import { bedrockClient, BEDROCK_MODEL_ID } from '../../config/bedrock';
 import { createLogger } from '../../config/logger';
 import {
-  ANALYZE_INTEGRITY_TOOL,
   CLAIM_EXTRACTION_TOOL,
-  INTEGRITY_SYSTEM_PROMPT,
-  INTEGRITY_USER_PROMPT,
-  SYSTEM_PROMPT,
-  USER_PROMPT,
+  TEXT_EXTRACTION_SYSTEM_PROMPT,
+  TEXT_EXTRACTION_USER_PROMPT,
+  IMAGE_EXTRACTION_SYSTEM_PROMPT,
+  IMAGE_EXTRACTION_USER_PROMPT,
+  TEXT_INTEGRITY_SYSTEM_PROMPT,
+  TEXT_INTEGRITY_USER_PROMPT,
+  TEXT_INTEGRITY_TOOL,
+  IMAGE_INTEGRITY_SYSTEM_PROMPT,
+  IMAGE_INTEGRITY_USER_PROMPT,
+  IMAGE_INTEGRITY_TOOL,
 } from '../../modules/claim/prompts';
 import type { ExtractedData } from '../../modules/claim/claim.types';
 import { S3Service } from './s3.service';
@@ -33,8 +38,6 @@ export interface ExtractionResult {
   documentSignals: DocumentSignals;
 }
 
-// ── Public integrity type ─────────────────────────────────────────────────────
-
 export interface IntegrityAnalysis {
   lowQualityDocument:  boolean;
   possibleAlteration:  boolean;
@@ -53,17 +56,13 @@ interface ClaimExtractionInput {
   documentSignals:    DocumentSignals;
 }
 
-// ── Content block builder ─────────────────────────────────────────────────────
+// ── Content type helpers ──────────────────────────────────────────────────────
 
 const IMAGE_FORMAT_MAP: Record<string, ImageFormat> = {
-  'image/jpeg': 'jpeg',
-  'jpeg':       'jpeg',
-  'image/png':  'png',
-  'png':        'png',
-  'image/gif':  'gif',
-  'gif':        'gif',
-  'image/webp': 'webp',
-  'webp':       'webp',
+  'image/jpeg': 'jpeg', 'jpeg': 'jpeg',
+  'image/png':  'png',  'png':  'png',
+  'image/gif':  'gif',  'gif':  'gif',
+  'image/webp': 'webp', 'webp': 'webp',
 };
 
 const DOCUMENT_FORMAT_MAP: Record<string, DocumentFormat> = {
@@ -71,54 +70,38 @@ const DOCUMENT_FORMAT_MAP: Record<string, DocumentFormat> = {
   'pdf':             'pdf',
 };
 
-function buildContentBlock(buffer: Buffer, mimeType: string): ContentBlock {
-  const docFormat = DOCUMENT_FORMAT_MAP[mimeType];
-  if (docFormat) {
-    return {
-      document: {
-        format: docFormat,
-        name:   'claim-document',
-        source: { bytes: buffer },
-      },
-    };
-  }
-
-  const imgFormat = IMAGE_FORMAT_MAP[mimeType] ?? 'jpeg';
-  return {
-    image: {
-      format: imgFormat,
-      source: { bytes: buffer },
-    },
-  };
+function isImageType(contentType: string): boolean {
+  return contentType in IMAGE_FORMAT_MAP;
 }
 
-// ── Shared helper ─────────────────────────────────────────────────────────────
+function buildContentBlock(buffer: Buffer, contentType: string): ContentBlock {
+  const docFormat = DOCUMENT_FORMAT_MAP[contentType];
+  if (docFormat) {
+    return { document: { format: docFormat, name: 'claim-document', source: { bytes: buffer } } };
+  }
+  return { image: { format: IMAGE_FORMAT_MAP[contentType] ?? 'jpeg', source: { bytes: buffer } } };
+}
+
+// ── Core invocation helper ────────────────────────────────────────────────────
 
 async function invokeWithTool<T>(
-  buffer:     Buffer,
-  mimeType:   string,
+  buffer:       Buffer,
+  contentType:  string,
   systemPrompt: string,
   userPrompt:   string,
   tool:         Tool,
   toolName:     string,
 ): Promise<T> {
-  const contentBlock = buildContentBlock(buffer, mimeType);
+  const contentBlock = buildContentBlock(buffer, contentType);
 
-  const response = await bedrockClient.send(
-    new ConverseCommand({
-      modelId: BEDROCK_MODEL_ID,
-      system:  [{ text: systemPrompt }],
-      messages: [{ role: 'user', content: [contentBlock, { text: userPrompt }] }],
-      toolConfig: {
-        tools:      [tool],
-        toolChoice: { tool: { name: toolName } },
-      },
-    }),
-  );
+  const response = await bedrockClient.send(new ConverseCommand({
+    modelId: BEDROCK_MODEL_ID,
+    system:  [{ text: systemPrompt }],
+    messages: [{ role: 'user', content: [contentBlock, { text: userPrompt }] }],
+    toolConfig: { tools: [tool], toolChoice: { tool: { name: toolName } } },
+  }));
 
-  const toolBlock = response.output?.message?.content?.find(
-    (b) => b.toolUse?.name === toolName,
-  );
+  const toolBlock = response.output?.message?.content?.find(b => b.toolUse?.name === toolName);
   if (!toolBlock?.toolUse?.input) {
     throw new Error(`Bedrock did not return "${toolName}" block (stopReason: ${response.stopReason})`);
   }
@@ -128,13 +111,19 @@ async function invokeWithTool<T>(
 // ── Service ───────────────────────────────────────────────────────────────────
 
 export const BedrockService = {
+
   async extractFromDocument(documentKey: string, contentType: string): Promise<ExtractionResult> {
-    logger.info('Extracting structured data', { documentKey, contentType });
+    const isImage = isImageType(contentType);
+    logger.info('Extracting structured data', { documentKey, contentType, mode: isImage ? 'image' : 'text' });
 
     const { buffer } = await S3Service.getDocument(documentKey);
+
+    const systemPrompt = isImage ? IMAGE_EXTRACTION_SYSTEM_PROMPT : TEXT_EXTRACTION_SYSTEM_PROMPT;
+    const userPrompt   = isImage ? IMAGE_EXTRACTION_USER_PROMPT   : TEXT_EXTRACTION_USER_PROMPT;
+
     const input = await invokeWithTool<ClaimExtractionInput>(
       buffer, contentType,
-      SYSTEM_PROMPT, USER_PROMPT,
+      systemPrompt, userPrompt,
       CLAIM_EXTRACTION_TOOL, 'extract_claim_data',
     );
 
@@ -152,13 +141,19 @@ export const BedrockService = {
   },
 
   async analyzeIntegrity(documentKey: string, contentType: string): Promise<IntegrityAnalysis> {
-    logger.info('Analyzing document integrity', { documentKey, contentType });
+    const isImage = isImageType(contentType);
+    logger.info('Analyzing document integrity', { documentKey, contentType, mode: isImage ? 'image' : 'text' });
 
     const { buffer } = await S3Service.getDocument(documentKey);
+
+    const systemPrompt = isImage ? IMAGE_INTEGRITY_SYSTEM_PROMPT : TEXT_INTEGRITY_SYSTEM_PROMPT;
+    const userPrompt   = isImage ? IMAGE_INTEGRITY_USER_PROMPT   : TEXT_INTEGRITY_USER_PROMPT;
+    const tool         = isImage ? IMAGE_INTEGRITY_TOOL           : TEXT_INTEGRITY_TOOL;
+
     return invokeWithTool<IntegrityAnalysis>(
       buffer, contentType,
-      INTEGRITY_SYSTEM_PROMPT, INTEGRITY_USER_PROMPT,
-      ANALYZE_INTEGRITY_TOOL, 'analyze_integrity',
+      systemPrompt, userPrompt,
+      tool, 'analyze_integrity',
     );
   },
 };
