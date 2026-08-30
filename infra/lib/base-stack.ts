@@ -20,6 +20,8 @@ import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as sns from "aws-cdk-lib/aws-sns";
+import * as events from "aws-cdk-lib/aws-events";
+import * as eventsTargets from "aws-cdk-lib/aws-events-targets";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -447,6 +449,13 @@ export class AssistanceStack extends cdk.Stack {
       actions: ["dynamodb:GetItem", "dynamodb:UpdateItem"],
       resources: [this.claimsTable.tableArn],
     }));
+    // SageMaker Serverless: invoke fraud scoring endpoint (optional — only used when
+    // FRAUD_SCORING_ENDPOINT_NAME is set after training; graceful fallback to rules)
+    sfAggregateRole.addToPolicy(new iam.PolicyStatement({
+      sid:     "AllowSageMakerInvokeEndpoint",
+      actions: ["sagemaker:InvokeEndpoint"],
+      resources: [`arn:aws:sagemaker:${this.region}:${this.account}:endpoint/fraud-scoring-*`],
+    }));
     appSecret.grantRead(sfAggregateRole);
 
     // ── Step Functions Lambda functions ───────────────────────────────────────
@@ -532,7 +541,14 @@ export class AssistanceStack extends cdk.Stack {
       role:         sfAggregateRole,
       timeout:      cdk.Duration.seconds(30),
       memorySize:   256,
-      environment:  sharedEnv,
+      environment: {
+        ...sharedEnv,
+        // Set after training: aws lambda update-function-configuration \
+        //   --function-name <name> \
+        //   --environment "Variables={FRAUD_SCORING_ENDPOINT_NAME=fraud-scoring-serverless}"
+        // Leave empty to use rule-based fallback (safe default)
+        FRAUD_SCORING_ENDPOINT_NAME: process.env.FRAUD_SCORING_ENDPOINT_NAME ?? "",
+      },
       bundling:     sharedBundling,
     });
 
@@ -1155,6 +1171,159 @@ export class AssistanceStack extends cdk.Stack {
       value:       alarmTopic.topicArn,
       description: "SNS topic for operational alarms — subscribe to receive email/Slack notifications",
       exportName:  `${serviceName}-alarm-topic-arn`,
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ML — Fraud Model Retraining (monthly, fully managed in AWS)
+    //
+    // Flow:
+    //   EventBridge Rule (cron: 1st of month, 06:00 UTC)
+    //     → Lambda: fraud-retrain-trigger
+    //         → SageMaker Processing Job (ml.m5.large, sklearn container)
+    //             → train.py:
+    //                 1. Load dataset from S3 (ML bucket)
+    //                 2. Security preprocessing (PII removal, k-anonymity)
+    //                 3. Train XGBoost
+    //                 4. If AUC ≥ MIN_AUC → create/update Serverless endpoint
+    //                 5. Update aggregate-risk Lambda env var
+    //
+    // One-time setup after deploy:
+    //   Upload dataset: aws s3 cp insurance_claims.csv s3://<ML_BUCKET>/fraud-scoring/dataset/insurance_claims.csv
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // S3 bucket — ML artifacts (source code, dataset, model outputs, metadata)
+    const mlBucket = new s3.Bucket(this, "MlBucket", {
+      bucketName:        `${serviceName}-ml-artifacts`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL:        true,
+      removalPolicy:     cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      lifecycleRules: [{
+        id:         "expire-training-outputs",
+        prefix:     "fraud-scoring/output/",
+        expiration: cdk.Duration.days(30),
+        enabled:    true,
+      }],
+    });
+
+    // Upload training source files to S3 at every CDK deploy
+    // The Processing Job mounts this prefix as /opt/ml/processing/input/code/
+    new s3deploy.BucketDeployment(this, "MlTrainingSource", {
+      sources: [s3deploy.Source.asset(path.join(__dirname, "../../ml"), {
+        exclude: ["*.ipynb", "*.png", "model/", "__pycache__/", "model.tar.gz"],
+      })],
+      destinationBucket:    mlBucket,
+      destinationKeyPrefix: "fraud-scoring/source/",
+    });
+
+    // SageMaker execution role — assumed by the Processing Job container
+    // Needs: S3 R/W (dataset + model artifacts), endpoint management, Lambda env update
+    const smExecutionRole = new iam.Role(this, "SmExecutionRole", {
+      roleName:  `${serviceName}-sm-execution-role`,
+      assumedBy: new iam.ServicePrincipal("sagemaker.amazonaws.com"),
+      // AmazonSageMakerFullAccess grants ECR pull, CloudWatch Logs, and core SM APIs
+      // required for Processing Job container lifecycle
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSageMakerFullAccess"),
+      ],
+    });
+    mlBucket.grantReadWrite(smExecutionRole);
+
+    // train.py creates/updates the inference endpoint from inside the Processing Job
+    smExecutionRole.addToPolicy(new iam.PolicyStatement({
+      sid:     "AllowInferenceEndpointManagement",
+      actions: [
+        "sagemaker:CreateModel",
+        "sagemaker:CreateEndpointConfig",
+        "sagemaker:CreateEndpoint",
+        "sagemaker:UpdateEndpoint",
+        "sagemaker:DescribeEndpoint",
+      ],
+      resources: [
+        `arn:aws:sagemaker:${this.region}:${this.account}:model/fraud-scoring-*`,
+        `arn:aws:sagemaker:${this.region}:${this.account}:endpoint-config/fraud-scoring-*`,
+        `arn:aws:sagemaker:${this.region}:${this.account}:endpoint/fraud-scoring-serverless`,
+      ],
+    }));
+
+    // train.py updates FRAUD_SCORING_ENDPOINT_NAME on the aggregate-risk Lambda
+    smExecutionRole.addToPolicy(new iam.PolicyStatement({
+      sid:     "AllowUpdateAggregateRiskEnv",
+      actions: ["lambda:GetFunctionConfiguration", "lambda:UpdateFunctionConfiguration"],
+      resources: [aggregateRiskFn.functionArn],
+    }));
+
+    // train.py calls sagemaker:CreateModel which requires PassRole back to itself
+    smExecutionRole.addToPolicy(new iam.PolicyStatement({
+      sid:     "AllowPassRoleToSelf",
+      actions: ["iam:PassRole"],
+      resources: [smExecutionRole.roleArn],
+    }));
+
+    // Lambda role — only needs CreateProcessingJob + PassRole to SageMaker exec role
+    const fraudRetrainTriggerRole = new iam.Role(this, "FraudRetrainTriggerRole", {
+      roleName:        `${serviceName}-fraud-retrain-trigger-role`,
+      assumedBy:       new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole")],
+    });
+    fraudRetrainTriggerRole.addToPolicy(new iam.PolicyStatement({
+      sid:       "AllowCreateProcessingJob",
+      actions:   ["sagemaker:CreateProcessingJob"],
+      resources: [`arn:aws:sagemaker:${this.region}:${this.account}:processing-job/fraud-scoring-retrain-*`],
+    }));
+    fraudRetrainTriggerRole.addToPolicy(new iam.PolicyStatement({
+      sid:       "AllowPassSmRole",
+      actions:   ["iam:PassRole"],
+      resources: [smExecutionRole.roleArn],
+    }));
+
+    const sklearnImageUri = `683313688378.dkr.ecr.${this.region}.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3`;
+
+    const fraudRetrainTriggerFn = new lambdaNodejs.NodejsFunction(this, "FraudRetrainTriggerFn", {
+      functionName: `${serviceName}-fraud-retrain-trigger`,
+      description:  "EventBridge monthly trigger — starts SageMaker Processing Job for fraud model retraining",
+      runtime:      lambda.Runtime.NODEJS_22_X,
+      entry:        path.join(__dirname, `${handlersBase}/fraud-retrain-trigger.handler.ts`),
+      handler:      "handler",
+      role:         fraudRetrainTriggerRole,
+      timeout:      cdk.Duration.seconds(30),
+      memorySize:   256,
+      environment: {
+        ML_BUCKET:             mlBucket.bucketName,
+        SM_EXECUTION_ROLE_ARN: smExecutionRole.roleArn,
+        ENDPOINT_NAME:         "fraud-scoring-serverless",
+        LAMBDA_FUNCTION_NAME:  aggregateRiskFn.functionName,
+        MIN_AUC:               "0.70",
+        SKLEARN_IMAGE_URI:     sklearnImageUri,
+      },
+      bundling: sharedBundling,
+    });
+
+    // EventBridge Rule — cron: 1st of every month at 06:00 UTC
+    // Syntax: minute hour day month weekday (? = any, * = all)
+    new events.Rule(this, "FraudRetrainMonthlyRule", {
+      ruleName:    `${serviceName}-fraud-retrain-monthly`,
+      description: "Monthly fraud model retraining — 1st of month 06:00 UTC",
+      schedule:    events.Schedule.cron({ minute: "0", hour: "6", day: "1", month: "*" }),
+      targets:     [new eventsTargets.LambdaFunction(fraudRetrainTriggerFn, {
+        retryAttempts: 2,
+      })],
+    });
+
+    new cdk.CfnOutput(this, "MlBucketName", {
+      value:       mlBucket.bucketName,
+      description: "S3 bucket for ML artifacts — upload dataset here before first retrain",
+      exportName:  `${serviceName}-ml-bucket`,
+    });
+
+    new cdk.CfnOutput(this, "DatasetUploadCommand", {
+      value:       `aws s3 cp insurance_claims.csv s3://${mlBucket.bucketName}/fraud-scoring/dataset/insurance_claims.csv`,
+      description: "One-time command to upload the Kaggle dataset before the first retraining run",
+    });
+
+    new cdk.CfnOutput(this, "ManualRetrainCommand", {
+      value:       `aws lambda invoke --function-name ${serviceName}-fraud-retrain-trigger /dev/null`,
+      description: "Trigger a manual retraining run outside of the monthly schedule",
     });
   }
 }

@@ -38,6 +38,8 @@
   },
   "devDependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1121.0",
+    "@aws-sdk/client-sagemaker": "^3.1121.0",
+    "@aws-sdk/client-sagemaker-runtime": "^3.1121.0",
     "@eslint/js": "^10.0.1",
     "@types/aws-lambda": "^8.10.161",
     "@types/aws4": "^1.11.6",

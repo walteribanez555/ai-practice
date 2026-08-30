@@ -49,6 +49,7 @@ export interface Claim extends Record<string, unknown> {
   // Fraud risk (internal — never exposed to the client)
   fraudRiskScore?: number;
   riskJustification?: string;
+  fraudScoringMethod?: 'ml' | 'rules';
   // Coverage decision
   coverageApplies?:      Coverage;
   coverageClause?:       string;
@@ -83,6 +84,7 @@ export type UpdateClaimInput = Partial<
     | 'descriptionSummary'
     | 'fraudRiskScore'
     | 'riskJustification'
+    | 'fraudScoringMethod'
     | 'coverageApplies'
     | 'requiresHumanReview'
     | 'priority'

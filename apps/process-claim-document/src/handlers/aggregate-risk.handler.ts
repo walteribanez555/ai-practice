@@ -6,9 +6,14 @@
  *   phase1Results[1] → HistoryResult
  *   phase2Results[0] → ConsistencyResult (cross-document synthesis)
  *   phase2Results[1] → CoverageResult
+ *
+ * Fraud scoring strategy:
+ *   Primary  — XGBoost model via SageMaker Serverless (FRAUD_SCORING_ENDPOINT_NAME)
+ *   Fallback — rule-based heuristics (always runs for explainability signals)
  */
 
 import type { Handler } from 'aws-lambda';
+import { SageMakerRuntimeClient, InvokeEndpointCommand } from '@aws-sdk/client-sagemaker-runtime';
 import { ClaimEntity } from '../orm/entities/claim.entity';
 import type { DocumentAnalysis } from '../orm/entities/claim.entity';
 import { createLogger } from '../config/logger';
@@ -18,6 +23,11 @@ const logger = createLogger('AggregateRisk');
 
 const FRAUD_THRESHOLD       = 60;
 const HIGH_AMOUNT_THRESHOLD = 50_000;
+const ENDPOINT_NAME         = process.env.FRAUD_SCORING_ENDPOINT_NAME ?? '';
+
+const sagemakerClient = ENDPOINT_NAME
+  ? new SageMakerRuntimeClient({})
+  : null;
 
 function mergeExtractions(extractions: ExtractionResult[]) {
   const claimType          = extractions.find(e => e.claimType)?.claimType ?? null;
@@ -29,7 +39,85 @@ function mergeExtractions(extractions: ExtractionResult[]) {
   return { claimType, estimatedAmount, incidentDate, descriptionSummary, involvedParties, claimTypes };
 }
 
-function computeFraudScore(
+// Builds the feature vector that maps Step Function outputs to the trained
+// XGBoost feature space (see ml/fraud_scoring_training.ipynb section 13).
+// Feature order MUST match FEATURE_COLS in the notebook.
+function buildFeatureVector(
+  integrities:         IntegrityResult[],
+  history:             { recentClaimCount: number; flagged: boolean },
+  estimatedAmount:     number | null,
+  involvedPartiesCount: number,
+): number[] {
+  const avgIntegrity   = integrities.reduce((s, i) => s + i.integrityScore, 0) / integrities.length;
+  const anyAlteration  = integrities.some(i => i.possibleAlteration) ? 1 : 0;
+  const anyLowQuality  = integrities.some(i => i.lowQualityDocument);
+  const anyInconsistent = integrities.some(i => i.inconsistentParties) ? 1 : 0;
+
+  // Map integrityScore (0–100) to incident_severity ordinal (1–4)
+  // Low integrity → high severity (more likely fraud signal)
+  const incidentSeverity = avgIntegrity >= 80 ? 1 : avgIntegrity >= 60 ? 2 : avgIntegrity >= 40 ? 3 : 4;
+
+  // Feature vector — order must match FEATURE_COLS in the notebook exactly.
+  // Unknown fields (not derivable from SF outputs) use training-set medians.
+  return [
+    estimatedAmount     ?? 50_000, // total_claim_amount     (median default)
+    0,                             // injury_claim           (unknown)
+    anyAlteration * 25_000,        // property_claim         (proxy: alteration → damage)
+    0,                             // vehicle_claim          (unknown)
+    involvedPartiesCount || 1,     // number_of_vehicles_involved
+    anyInconsistent,               // bodily_injuries        (proxy: party inconsistency)
+    0,                             // witnesses              (unknown)
+    anyAlteration,                 // property_damage        (1=YES, 0=NO)
+    anyLowQuality ? 0 : 1,         // police_report_available (inverted from quality)
+    incidentSeverity,              // incident_severity      (1–4)
+    0,                             // incident_type          (median-encoded)
+    0,                             // collision_type         (median-encoded)
+    0,                             // authorities_contacted  (median-encoded)
+    new Date().getMonth() + 1,     // incident_month         (current month)
+    40,                            // age_bucket             (median bucket)
+    60,                            // months_as_customer     (median ~5 years)
+    0,                             // insured_sex            (median-encoded)
+    1,                             // insured_education_level (median-encoded)
+    0,                             // insured_occupation     (median-encoded)
+    0,                             // insured_hobbies        (median-encoded)
+    0,                             // insured_relationship   (median-encoded)
+    0,                             // incident_state         (median-encoded)
+    0,                             // auto_make              (median-encoded)
+    0,                             // auto_model             (median-encoded)
+    2015,                          // auto_year              (median)
+    0,                             // capital_gains          (default 0 after noise)
+    0,                             // capital_loss           (default 0 after noise)
+    500,                           // policy_deductable      (median)
+    1_200,                         // policy_annual_premium  (median)
+    0,                             // umbrella_limit         (median)
+    history.recentClaimCount,      // extra: recent claim count (appended)
+    history.flagged ? 1 : 0,       // extra: history flagged
+  ];
+}
+
+async function scoreFraudML(featureVector: number[]): Promise<number | null> {
+  if (!sagemakerClient || !ENDPOINT_NAME) return null;
+
+  try {
+    const csvRow = featureVector.join(',');
+    const cmd = new InvokeEndpointCommand({
+      EndpointName: ENDPOINT_NAME,
+      ContentType:  'text/csv',
+      Accept:       'text/csv',
+      Body:         Buffer.from(csvRow),
+    });
+    const response = await sagemakerClient.send(cmd);
+    const body     = new TextDecoder().decode(response.Body as Uint8Array);
+    const probability = parseFloat(body.trim());
+    if (isNaN(probability)) throw new Error(`Unexpected ML response: ${body}`);
+    return Math.min(Math.round(probability * 100), 100);
+  } catch (err) {
+    logger.warn('ML scoring failed — using rule-based fallback', { error: String(err) });
+    return null;
+  }
+}
+
+function computeRuleBasedScore(
   integrities:     IntegrityResult[],
   history:         { recentClaimCount: number; flagged: boolean },
   contradictions:  string[],
@@ -92,9 +180,18 @@ export const handler: Handler<AggregateRiskEvent> = async (event) => {
   const { claimType, estimatedAmount, incidentDate, descriptionSummary, involvedParties, claimTypes } =
     mergeExtractions(extractions);
 
-  const { score: fraudScore, signals } = computeFraudScore(
+  // Rule-based signals always run — provide explainability regardless of scoring path
+  const { score: rulesScore, signals } = computeRuleBasedScore(
     integrities, history, consistency?.contradictions ?? [], claimTypes,
   );
+
+  // ML scoring: if endpoint configured, override the numeric score; keep rule signals
+  const featureVector = buildFeatureVector(integrities, history, estimatedAmount, involvedParties.length);
+  const mlScore       = await scoreFraudML(featureVector);
+  const fraudScore    = mlScore ?? rulesScore;
+  const scoringMethod = mlScore !== null ? 'ml' : 'rules';
+
+  logger.info('Risk scored', { claimId, fraudScore, scoringMethod, mlScore, rulesScore });
 
   const requiresHumanReview = fraudScore >= FRAUD_THRESHOLD;
   const priority = (
@@ -128,6 +225,7 @@ export const handler: Handler<AggregateRiskEvent> = async (event) => {
     descriptionSummary:  descriptionSummary ?? undefined,
     fraudRiskScore:      fraudScore,
     riskJustification:   signals.join(' | ') || undefined,
+    fraudScoringMethod:  scoringMethod,
     coverageApplies:     coverage.coverageApplies,
     coverageClause:      coverage.referenceClause ?? undefined,
     crossDocConsistent:  consistency?.consistent ?? true,
