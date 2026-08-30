@@ -1,3 +1,4 @@
+// Updated: process endpoint now starts Step Functions execution
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { config, createLogger } from './config';

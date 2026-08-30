@@ -53,6 +53,17 @@ jobs:
             dashboard:
               - 'apps/dashboard/**'
 
+      - uses: actions/setup-node@v4
+        if: github.event_name != 'pull_request'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install workspace deps (needed for CDK synth during drift check)
+        if: github.event_name != 'pull_request'
+        run: npm ci
+
       - name: Install infra deps (drift check)
         if: github.event_name != 'pull_request'
         run: npm ci

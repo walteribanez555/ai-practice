@@ -1,5 +1,6 @@
 // ── Shared Step Functions types ───────────────────────────────────────────────
 // These flow through the state machine between Lambda handlers.
+// Updated: Knowledge Base + OpenSearch Service integration active.
 
 export interface DocumentRef {
   key:           string;

@@ -1,3 +1,4 @@
+// Updated: OpenSearch Service + Bedrock Knowledge Base + Step Functions multi-doc analysis
 import * as cdk from "aws-cdk-lib";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
