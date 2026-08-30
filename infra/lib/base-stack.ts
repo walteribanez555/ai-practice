@@ -17,6 +17,9 @@ import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as s3notifications from "aws-cdk-lib/aws-s3-notifications";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
+import * as sns from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -522,24 +525,34 @@ export class AssistanceStack extends cdk.Stack {
 
     // ── State machine definition ──────────────────────────────────────────────
 
+    // Shared retry policy: transient Lambda/Bedrock errors with exponential backoff
+    const lambdaRetry: sfn.RetryProps = {
+      errors:      ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "Lambda.SdkClientException", "States.TaskFailed"],
+      maxAttempts: 3,
+      interval:    cdk.Duration.seconds(3),
+      backoffRate: 2,
+    };
+
     // Per-document parallel: extract-data ∥ analyze-integrity
+    const extractDataTask = new tasks.LambdaInvoke(this, "ExtractData", {
+      lambdaFunction:    extractDataFn,
+      payloadResponseOnly: true,
+      comment:           "Extract structured claim data (claimType, amount, date, parties)",
+    });
+    extractDataTask.addRetry(lambdaRetry);
+
+    const analyzeIntegrityTask = new tasks.LambdaInvoke(this, "AnalyzeIntegrity", {
+      lambdaFunction:    analyzeIntegrityFn,
+      payloadResponseOnly: true,
+      comment:           "Assess document for alteration, quality and internal consistency",
+    });
+    analyzeIntegrityTask.addRetry(lambdaRetry);
+
     const perDocParallel = new sfn.Parallel(this, "PerDocAnalysis", {
       comment: "Analyze one document from two independent angles simultaneously",
     });
-    perDocParallel.branch(
-      new tasks.LambdaInvoke(this, "ExtractData", {
-        lambdaFunction:    extractDataFn,
-        payloadResponseOnly: true,
-        comment:           "Extract structured claim data (claimType, amount, date, parties)",
-      }),
-    );
-    perDocParallel.branch(
-      new tasks.LambdaInvoke(this, "AnalyzeIntegrity", {
-        lambdaFunction:    analyzeIntegrityFn,
-        payloadResponseOnly: true,
-        comment:           "Assess document for alteration, quality and internal consistency",
-      }),
-    );
+    perDocParallel.branch(extractDataTask);
+    perDocParallel.branch(analyzeIntegrityTask);
 
     // Map over all documents in parallel
     const mapDocuments = new sfn.Map(this, "MapDocuments", {
@@ -553,33 +566,36 @@ export class AssistanceStack extends cdk.Stack {
     });
     mapDocuments.itemProcessor(perDocParallel);
 
+    const checkHistoryTask = new tasks.LambdaInvoke(this, "CheckHistory", {
+      lambdaFunction:    checkHistoryFn,
+      payloadResponseOnly: true,
+      payload:           sfn.TaskInput.fromObject({
+        "claimId.$":  "$.claimId",
+        "clientId.$": "$.clientId",
+      }),
+      comment: "Check client's recent claim history for frequency fraud signals",
+    });
+    checkHistoryTask.addRetry(lambdaRetry);
+
+    const checkCoverageTask = new tasks.LambdaInvoke(this, "CheckCoverage", {
+      lambdaFunction:    checkCoverageFn,
+      payloadResponseOnly: true,
+      payload:           sfn.TaskInput.fromObject({
+        "claimId.$":      "$.claimId",
+        "claimContext.$": "$.claimContext",
+      }),
+      comment: "Query Bedrock Knowledge Base to verify policy coverage",
+    });
+    checkCoverageTask.addRetry(lambdaRetry);
+
     // Top-level parallel: documents ∥ history ∥ coverage
     const topParallel = new sfn.Parallel(this, "ClaimAnalysisParallel", {
       comment:    "Run all analysis branches simultaneously",
       resultPath: sfn.JsonPath.stringAt("$.analysisResults"),
     });
     topParallel.branch(mapDocuments);
-    topParallel.branch(
-      new tasks.LambdaInvoke(this, "CheckHistory", {
-        lambdaFunction:    checkHistoryFn,
-        payloadResponseOnly: true,
-        payload:           sfn.TaskInput.fromObject({
-          "claimId.$":  "$.claimId",
-          "clientId.$": "$.clientId",
-        }),
-        comment: "Check client's recent claim history for frequency fraud signals",
-      }),
-    );
-    topParallel.branch(
-      new tasks.LambdaInvoke(this, "CheckCoverage", {
-        lambdaFunction:    checkCoverageFn,
-        payloadResponseOnly: true,
-        payload:           sfn.TaskInput.fromObject({
-          "claimId.$": "$.claimId",
-        }),
-        comment: "Query Bedrock Knowledge Base to verify policy coverage",
-      }),
-    );
+    topParallel.branch(checkHistoryTask);
+    topParallel.branch(checkCoverageTask);
 
     // Final aggregation
     const aggregateRiskTask = new tasks.LambdaInvoke(this, "AggregateRisk", {
@@ -587,6 +603,7 @@ export class AssistanceStack extends cdk.Stack {
       payloadResponseOnly: true,
       comment:           "Merge all analyses into composite fraud score and update DynamoDB",
     });
+    aggregateRiskTask.addRetry({ ...lambdaRetry, maxAttempts: 2 });
 
     // Error catch — resultPath merges error info into the original input so $.claimId is still accessible.
     // handleError routes to aggregateRiskTask so the claim is marked as error in DynamoDB.
@@ -756,6 +773,10 @@ export class AssistanceStack extends cdk.Stack {
       apiId:      this.claimsHttpApi.ref,
       stageName:  "$default",
       autoDeploy: true,
+      defaultRouteSettings: {
+        throttlingBurstLimit:  50,   // max concurrent requests in flight
+        throttlingRateLimit:   100,  // sustained req/s per stage
+      },
       accessLogSettings: {
         destinationArn: claimsApiGwLogGroup.logGroupArn,
         format: JSON.stringify({
@@ -915,6 +936,191 @@ export class AssistanceStack extends cdk.Stack {
         `--secret-string '{"CORS_ORIGINS":"*","LOG_LEVEL":"${isProd ? "info" : "debug"}"}'`,
       ].join(" \\\n  "),
       description: "One-time command to create the secret before first CDK deploy",
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Observability — CloudWatch Alarms + Dashboard
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // SNS topic for alarm notifications (subscribe manually to add email/Slack)
+    const alarmTopic = new sns.Topic(this, "AlarmTopic", {
+      topicName:   `${serviceName}-alarms`,
+      displayName: "Assistance Platform Alarms",
+    });
+
+    // ── Alarm 1: Step Function failures ──────────────────────────────────────
+    const sfnFailedAlarm = new cloudwatch.Alarm(this, "SfnFailedAlarm", {
+      alarmName:          `${serviceName}-sfn-failed`,
+      alarmDescription:   "Claim processing Step Function execution failed",
+      metric:             new cloudwatch.Metric({
+        namespace:  "AWS/States",
+        metricName: "ExecutionsFailed",
+        dimensionsMap: { StateMachineArn: claimProcessingStateMachine.stateMachineArn },
+        statistic:  "Sum",
+        period:     cdk.Duration.minutes(5),
+      }),
+      threshold:          1,
+      evaluationPeriods:  1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData:   cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    sfnFailedAlarm.addAlarmAction(new cwActions.SnsAction(alarmTopic));
+
+    // ── Alarm 2: Claims API Lambda errors ─────────────────────────────────────
+    const apiErrorAlarm = new cloudwatch.Alarm(this, "ApiErrorAlarm", {
+      alarmName:          `${serviceName}-api-errors`,
+      alarmDescription:   "Claims API Lambda error rate elevated",
+      metric:             this.claimsApiFn.metricErrors({
+        period:    cdk.Duration.minutes(5),
+        statistic: "Sum",
+      }),
+      threshold:          5,
+      evaluationPeriods:  1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData:   cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    apiErrorAlarm.addAlarmAction(new cwActions.SnsAction(alarmTopic));
+
+    // ── Alarm 3: Claims API Lambda p99 duration ────────────────────────────────
+    const apiLatencyAlarm = new cloudwatch.Alarm(this, "ApiLatencyAlarm", {
+      alarmName:          `${serviceName}-api-latency-p99`,
+      alarmDescription:   "Claims API p99 latency above 10s",
+      metric:             this.claimsApiFn.metricDuration({
+        period:    cdk.Duration.minutes(5),
+        statistic: "p99",
+      }),
+      threshold:          10_000,
+      evaluationPeriods:  2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData:   cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    apiLatencyAlarm.addAlarmAction(new cwActions.SnsAction(alarmTopic));
+
+    // ── Alarm 4: API Gateway 4xx rate ─────────────────────────────────────────
+    const apiGw4xxAlarm = new cloudwatch.Alarm(this, "ApiGw4xxAlarm", {
+      alarmName:          `${serviceName}-apigw-4xx`,
+      alarmDescription:   "API Gateway client error rate elevated — possible bad client or auth issues",
+      metric:             new cloudwatch.Metric({
+        namespace:  "AWS/ApiGateway",
+        metricName: "4XXError",
+        dimensionsMap: { ApiId: this.claimsHttpApi.ref },
+        statistic:  "Sum",
+        period:     cdk.Duration.minutes(5),
+      }),
+      threshold:          20,
+      evaluationPeriods:  1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData:   cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    apiGw4xxAlarm.addAlarmAction(new cwActions.SnsAction(alarmTopic));
+
+    // ── Alarm 5: API Gateway throttling (429) ──────────────────────────────────
+    const throttleAlarm = new cloudwatch.Alarm(this, "ApiThrottleAlarm", {
+      alarmName:          `${serviceName}-apigw-throttle`,
+      alarmDescription:   "API Gateway throttling requests — rate limit hit",
+      metric:             new cloudwatch.Metric({
+        namespace:  "AWS/ApiGateway",
+        metricName: "Count",
+        dimensionsMap: { ApiId: this.claimsHttpApi.ref },
+        statistic:  "Sum",
+        period:     cdk.Duration.minutes(1),
+      }),
+      // This alarm is informational; actual throttle count tracked via 429 responses
+      threshold:          500,
+      evaluationPeriods:  1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData:   cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    throttleAlarm.addAlarmAction(new cwActions.SnsAction(alarmTopic));
+
+    // ── CloudWatch Dashboard ──────────────────────────────────────────────────
+    new cloudwatch.Dashboard(this, "OperationalDashboard", {
+      dashboardName: `${serviceName}-ops`,
+      widgets: [
+        // Row 1: Step Function health
+        [
+          new cloudwatch.GraphWidget({
+            title:  "Step Function — Executions",
+            width:  12,
+            height: 6,
+            left: [
+              new cloudwatch.Metric({ namespace: "AWS/States", metricName: "ExecutionsStarted",   dimensionsMap: { StateMachineArn: claimProcessingStateMachine.stateMachineArn }, statistic: "Sum", period: cdk.Duration.minutes(5), label: "Started"   }),
+              new cloudwatch.Metric({ namespace: "AWS/States", metricName: "ExecutionsSucceeded", dimensionsMap: { StateMachineArn: claimProcessingStateMachine.stateMachineArn }, statistic: "Sum", period: cdk.Duration.minutes(5), label: "Succeeded" }),
+              new cloudwatch.Metric({ namespace: "AWS/States", metricName: "ExecutionsFailed",    dimensionsMap: { StateMachineArn: claimProcessingStateMachine.stateMachineArn }, statistic: "Sum", period: cdk.Duration.minutes(5), label: "Failed"    }),
+            ],
+          }),
+          new cloudwatch.GraphWidget({
+            title:  "Step Function — Duration (ms)",
+            width:  12,
+            height: 6,
+            left: [
+              new cloudwatch.Metric({ namespace: "AWS/States", metricName: "ExecutionTime", dimensionsMap: { StateMachineArn: claimProcessingStateMachine.stateMachineArn }, statistic: "p50",  period: cdk.Duration.minutes(5), label: "p50"  }),
+              new cloudwatch.Metric({ namespace: "AWS/States", metricName: "ExecutionTime", dimensionsMap: { StateMachineArn: claimProcessingStateMachine.stateMachineArn }, statistic: "p99",  period: cdk.Duration.minutes(5), label: "p99"  }),
+            ],
+          }),
+        ],
+        // Row 2: API health
+        [
+          new cloudwatch.GraphWidget({
+            title:  "Claims API — Invocations & Errors",
+            width:  12,
+            height: 6,
+            left: [
+              this.claimsApiFn.metricInvocations({ period: cdk.Duration.minutes(5), label: "Invocations" }),
+              this.claimsApiFn.metricErrors({      period: cdk.Duration.minutes(5), label: "Errors"      }),
+              this.claimsApiFn.metricThrottles({   period: cdk.Duration.minutes(5), label: "Throttles"   }),
+            ],
+          }),
+          new cloudwatch.GraphWidget({
+            title:  "Claims API — Duration (ms)",
+            width:  12,
+            height: 6,
+            left: [
+              this.claimsApiFn.metricDuration({ period: cdk.Duration.minutes(5), statistic: "p50",  label: "p50"  }),
+              this.claimsApiFn.metricDuration({ period: cdk.Duration.minutes(5), statistic: "p99",  label: "p99"  }),
+              this.claimsApiFn.metricDuration({ period: cdk.Duration.minutes(5), statistic: "p100", label: "max"  }),
+            ],
+          }),
+        ],
+        // Row 3: API Gateway
+        [
+          new cloudwatch.GraphWidget({
+            title:  "API Gateway — Request Count",
+            width:  12,
+            height: 6,
+            left: [
+              new cloudwatch.Metric({ namespace: "AWS/ApiGateway", metricName: "Count",    dimensionsMap: { ApiId: this.claimsHttpApi.ref }, statistic: "Sum", period: cdk.Duration.minutes(5), label: "Total requests" }),
+              new cloudwatch.Metric({ namespace: "AWS/ApiGateway", metricName: "4XXError", dimensionsMap: { ApiId: this.claimsHttpApi.ref }, statistic: "Sum", period: cdk.Duration.minutes(5), label: "4XX errors"     }),
+              new cloudwatch.Metric({ namespace: "AWS/ApiGateway", metricName: "5XXError", dimensionsMap: { ApiId: this.claimsHttpApi.ref }, statistic: "Sum", period: cdk.Duration.minutes(5), label: "5XX errors"     }),
+            ],
+          }),
+          new cloudwatch.GraphWidget({
+            title:  "API Gateway — Latency (ms)",
+            width:  12,
+            height: 6,
+            left: [
+              new cloudwatch.Metric({ namespace: "AWS/ApiGateway", metricName: "Latency",        dimensionsMap: { ApiId: this.claimsHttpApi.ref }, statistic: "p50",  period: cdk.Duration.minutes(5), label: "p50"  }),
+              new cloudwatch.Metric({ namespace: "AWS/ApiGateway", metricName: "Latency",        dimensionsMap: { ApiId: this.claimsHttpApi.ref }, statistic: "p99",  period: cdk.Duration.minutes(5), label: "p99"  }),
+              new cloudwatch.Metric({ namespace: "AWS/ApiGateway", metricName: "IntegrationLatency", dimensionsMap: { ApiId: this.claimsHttpApi.ref }, statistic: "p99", period: cdk.Duration.minutes(5), label: "integration p99" }),
+            ],
+          }),
+        ],
+        // Row 4: Alarm status panel
+        [
+          new cloudwatch.AlarmStatusWidget({
+            title:  "Alarm Status",
+            width:  24,
+            height: 3,
+            alarms: [sfnFailedAlarm, apiErrorAlarm, apiLatencyAlarm, apiGw4xxAlarm, throttleAlarm],
+          }),
+        ],
+      ],
+    });
+
+    new cdk.CfnOutput(this, "AlarmTopicArn", {
+      value:       alarmTopic.topicArn,
+      description: "SNS topic for operational alarms — subscribe to receive email/Slack notifications",
+      exportName:  `${serviceName}-alarm-topic-arn`,
     });
   }
 }

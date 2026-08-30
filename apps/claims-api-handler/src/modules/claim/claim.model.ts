@@ -11,5 +11,6 @@ export class ClaimModel {
   static findByPriority(priority: Priority)                  { return ClaimEntity.findByPriority(priority); }
   static create(input: CreateClaimInput)                     { return ClaimEntity.create(input); }
   static update(id: string, input: UpdateClaimInput)         { return ClaimEntity.update(id, input); }
-  static delete(id: string)                                  { return ClaimEntity.delete(id); }
+  static appendDocument(id: string, doc: import('../../orm/entities/claim.entity').DocumentRef) { return ClaimEntity.appendDocument(id, doc); }
+  static softDelete(id: string)                              { return ClaimEntity.softDelete(id); }
 }

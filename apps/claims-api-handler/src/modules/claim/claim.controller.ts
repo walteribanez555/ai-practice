@@ -112,13 +112,19 @@ export const ClaimController = {
 
     logger.info('Submitting claim — starting Step Function', { id, documentCount: claim.documents.length });
 
+    // Build a context hint for the KB coverage query from the document types
+    const docTypes = [...new Set(claim.documents.map(d => d.contentType))];
+    const claimContext = `Siniestro con ${claim.documents.length} documento(s): ${docTypes.join(', ')}${claim.policyId ? `. Poliza: ${claim.policyId}` : ''}`;
+
     await sfnClient.send(new StartExecutionCommand({
       stateMachineArn: SF_ARN,
       name:            `claim-${id}-${Date.now()}`,
       input:           JSON.stringify({
-        claimId:   claim.id,
-        clientId:  claim.clientId,
-        documents: claim.documents.map(d => ({ key: d.key, contentType: d.contentType, fileSizeBytes: d.fileSizeBytes })),
+        claimId:      claim.id,
+        clientId:     claim.clientId,
+        documents:    claim.documents.map(d => ({ key: d.key, contentType: d.contentType, fileSizeBytes: d.fileSizeBytes })),
+        claimContext,
+        ...(claim.policyId ? { policyId: claim.policyId } : {}),
       }),
     }));
 
@@ -138,10 +144,10 @@ export const ClaimController = {
       );
     }
 
-    // Build the documents array: prefer the stored documents[], fall back to single documentKey
-    const documents = claim.documents?.length
-      ? claim.documents
-      : [{ key: claim.documentKey, contentType: claim.contentType, fileSizeBytes: claim.fileSizeBytes }];
+    const documents = claim.documents ?? [];
+    if (!documents.length) {
+      return c.json({ error: 'Claim has no documents to process.', code: 'NO_DOCUMENTS' }, 422);
+    }
 
     await ClaimService.markProcessing(id);
 
@@ -170,11 +176,12 @@ export const ClaimController = {
     return c.json(toAdjusterResponse(claim));
   },
 
-  // ── DELETE /claims/:id — adjuster only ───────────────────────────────────
+  // ── DELETE /claims/:id — soft delete, adjuster only ─────────────────────
   async delete(c: Context<AppEnv>) {
-    const id      = c.req.param('id') ?? '';
-    const deleted = await ClaimService.delete(id);
-    if (!deleted) return c.json({ error: 'Claim not found.' }, 404);
+    const id    = c.req.param('id') ?? '';
+    const claim = await ClaimService.findById(id);
+    if (!claim || claim.deletedAt) return c.json({ error: 'Claim not found.' }, 404);
+    await ClaimService.softDelete(id);
     return c.body(null, 204);
   },
 };

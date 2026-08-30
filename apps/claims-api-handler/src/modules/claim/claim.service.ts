@@ -41,7 +41,7 @@ export const ClaimService = {
 
   async create(dto: CreateClaimDto): Promise<Claim> {
     return ClaimModel.create({
-      clientId: dto.clientId,
+      clientId: dto.clientId ?? '',
       ...(dto.policyId ? { policyId: dto.policyId } : {}),
     });
   },
@@ -121,8 +121,8 @@ export const ClaimService = {
 
   // ── Delete ────────────────────────────────────────────────────────────────
 
-  delete(id: string): Promise<boolean> {
-    return ClaimModel.delete(id);
+  softDelete(id: string) {
+    return ClaimModel.softDelete(id);
   },
 
   // ── Business logic (pure functions) ──────────────────────────────────────

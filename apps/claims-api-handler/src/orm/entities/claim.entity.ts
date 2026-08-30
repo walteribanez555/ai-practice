@@ -13,38 +13,28 @@ export interface DocumentRef {
 }
 
 export interface Claim extends Record<string, unknown> {
-  id: string;
-  status: ClaimStatus;
-  // Client info
-  clientId: string;
-  policyId?: string;
-  // Document references — primary doc kept for backward compat; use documents[] for multi-doc
-  documentKey: string;
-  contentType: string;
-  fileSizeBytes: number;
-  documents?: DocumentRef[];
-  // Extracted fields (absent = could not be read with confidence)
-  claimType?: string;
-  estimatedAmount?: number;
-  incidentDate?: string;        // YYYY-MM-DD
-  involvedParties?: string[];
+  id:                  string;
+  status:              ClaimStatus;
+  clientId:            string;
+  policyId?:           string;
+  documents?:          DocumentRef[];
+  // Extracted fields populated after processing
+  claimType?:          string;
+  estimatedAmount?:    number;
+  incidentDate?:       string;
+  involvedParties?:    string[];
   descriptionSummary?: string;
-  // Fraud risk (internal — never exposed to the client)
-  fraudRiskScore?: number;
-  riskJustification?: string;
-  // Coverage decision
-  coverageApplies?: Coverage;
-  // Routing
+  fraudRiskScore?:     number;
+  riskJustification?:  string;
+  coverageApplies?:    Coverage;
   requiresHumanReview: boolean;
-  priority?: Priority;
-  // Error details (populated when status = error)
-  errorReason?: string;
-  // Timestamps (ISO strings — doubles as GSI sort keys)
-  createdAt: string;
-  updatedAt: string;
-  processedAt?: string;
-  // Optional DynamoDB TTL (epoch seconds)
-  ttl?: number;
+  priority?:           Priority;
+  errorReason?:        string;
+  deletedAt?:          string;
+  createdAt:           string;
+  updatedAt:           string;
+  processedAt?:        string;
+  ttl?:                number;
 }
 
 export type CreateClaimInput = Pick<Claim, 'clientId'> & Partial<Pick<Claim, 'policyId'>>;
@@ -66,6 +56,8 @@ export type UpdateClaimInput = Partial<
     | 'errorReason'
     | 'processedAt'
     | 'updatedAt'
+    | 'deletedAt'
+    | 'documentAnalyses'
   >
 >;
 
@@ -77,19 +69,21 @@ const table = new DynamoTable<Claim>(docClient, CLAIMS_TABLE);
 
 export const ClaimEntity = {
 
-  findAll(): Promise<Claim[]> {
-    return table.scan();
+  async findAll(): Promise<Claim[]> {
+    const all = await table.scan();
+    return all.filter(c => !c.deletedAt);
   },
 
   findById(id: string): Promise<Claim | null> {
     return table.get(id);
   },
 
-  findByClientId(clientId: string): Promise<Claim[]> {
-    return table.queryIndex({
+  async findByClientId(clientId: string): Promise<Claim[]> {
+    const all = await table.queryIndex({
       indexName: 'clientId-createdAt-index',
       pk: { name: 'clientId', value: clientId },
     });
+    return all.filter(c => !c.deletedAt);
   },
 
   findRecentByClientId(clientId: string, since: Date): Promise<Claim[]> {
@@ -120,9 +114,6 @@ export const ClaimEntity = {
       id:                  randomUUID(),
       status:              'draft',
       clientId:            input.clientId,
-      documentKey:         '',
-      contentType:         '',
-      fileSizeBytes:       0,
       documents:           [],
       requiresHumanReview: false,
       createdAt:           now,
@@ -151,7 +142,8 @@ export const ClaimEntity = {
     return table.update(id, { ...input, updatedAt: new Date().toISOString() });
   },
 
-  delete(id: string): Promise<boolean> {
-    return table.delete(id);
+  // Soft delete — preserves the record for audit/compliance
+  softDelete(id: string): Promise<Claim | null> {
+    return table.update(id, { deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as UpdateClaimInput);
   },
 };
