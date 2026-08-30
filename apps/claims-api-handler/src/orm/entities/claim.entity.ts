@@ -12,12 +12,28 @@ export interface DocumentRef {
   fileSizeBytes?: number;
 }
 
+export interface DocumentAnalysis {
+  documentKey:         string;
+  contentType:         string;
+  claimType:           string | null;
+  estimatedAmount:     number | null;
+  incidentDate:        string | null;
+  involvedParties:     string[] | null;
+  descriptionSummary:  string | null;
+  lowQualityDocument:  boolean;
+  possibleAlteration:  boolean;
+  inconsistentParties: boolean;
+  observations:        string;
+  integrityScore:      number;
+}
+
 export interface Claim extends Record<string, unknown> {
   id:                  string;
   status:              ClaimStatus;
   clientId:            string;
   policyId?:           string;
   documents?:          DocumentRef[];
+  documentAnalyses?:   DocumentAnalysis[];
   // Extracted fields populated after processing
   claimType?:          string;
   estimatedAmount?:    number;

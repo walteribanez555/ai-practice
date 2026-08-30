@@ -1,4 +1,4 @@
-import type { Claim } from '../../orm/entities/claim.entity';
+import type { Claim, DocumentRef, DocumentAnalysis } from '../../orm/entities/claim.entity';
 import type { ClaimStatus, Coverage, ExtractedData, Priority } from './claim.types';
 
 // ── Input DTOs ────────────────────────────────────────────────────────────────
@@ -42,28 +42,30 @@ export interface UpdateClaimDto {
 
 /** Fields visible to the end client — no internal risk data. */
 export interface ClaimClientResponseDto {
-  id: string;
-  status: ClaimStatus;
-  claimType: string | null;
-  estimatedAmount: number | null;
-  incidentDate: string | null;
+  id:                 string;
+  status:             ClaimStatus;
+  claimType:          string | null;
+  estimatedAmount:    number | null;
+  incidentDate:       string | null;
   descriptionSummary: string | null;
-  coverageApplies: Coverage | null;
-  createdAt: string;
-  updatedAt: string;
-  processedAt: string | null;
+  coverageApplies:    Coverage | null;
+  createdAt:          string;
+  updatedAt:          string;
+  processedAt:        string | null;
+  documents:          DocumentRef[];
 }
 
 /** Full view for the adjuster — includes internal risk data. */
 export interface ClaimAdjusterResponseDto extends ClaimClientResponseDto {
-  clientId: string;
-  policyId: string | null;
-  involvedParties: string[] | null;
-  fraudRiskScore: number | null;
-  riskJustification: string | null;
+  clientId:            string;
+  policyId:            string | null;
+  involvedParties:     string[] | null;
+  fraudRiskScore:      number | null;
+  riskJustification:   string | null;
   requiresHumanReview: boolean;
-  priority: Priority | null;
-  errorReason: string | null;
+  priority:            Priority | null;
+  errorReason:         string | null;
+  documentAnalyses:    DocumentAnalysis[];
 }
 
 // ── Mappers ───────────────────────────────────────────────────────────────────
@@ -79,6 +81,7 @@ export const toClientResponse = (c: Claim): ClaimClientResponseDto => ({
   createdAt:          c.createdAt,
   updatedAt:          c.updatedAt,
   processedAt:        c.processedAt        ?? null,
+  documents:          c.documents          ?? [],
 });
 
 export const toAdjusterResponse = (c: Claim): ClaimAdjusterResponseDto => ({
@@ -91,4 +94,5 @@ export const toAdjusterResponse = (c: Claim): ClaimAdjusterResponseDto => ({
   requiresHumanReview: c.requiresHumanReview,
   priority:            c.priority             ?? null,
   errorReason:         c.errorReason          ?? null,
+  documentAnalyses:    c.documentAnalyses     ?? [],
 });
