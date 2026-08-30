@@ -8,14 +8,14 @@
 
   <!-- Main column -->
   <div
-    class="flex min-h-screen flex-col transition-all duration-300 ease-in-out"
+    class="flex min-h-screen w-full flex-col transition-all duration-300 ease-in-out"
     [ngClass]="{
-      'xl:ml-[290px]': (isExpanded$ | async) || (isHovered$ | async),
-      'xl:ml-[90px]':  !((isExpanded$ | async) || (isHovered$ | async))
+      'xl:ml-[290px] xl:w-[calc(100%-290px)]': (isExpanded$ | async) || (isHovered$ | async),
+      'xl:ml-[90px]  xl:w-[calc(100%-90px)]':  !((isExpanded$ | async) || (isHovered$ | async))
     }">
 
     <!-- Header (sticky, z-50 — sits above sidebar on mobile) -->
-    <app-header/>
+    <app-header class="block w-full"/>
 
     <!-- Page content -->
     <main class="flex-1 p-4 md:p-6">
