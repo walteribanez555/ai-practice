@@ -1591,11 +1591,12 @@ export class AssistanceStack extends cdk.Stack {
           logGroupName: bedrockInvocationLogGroup.logGroupName,
           roleArn:      bedrockLoggingRole.roleArn,
         },
-        // All three delivery flags OFF — destination exists but nothing is written.
+        // All delivery flags OFF — destination exists but nothing is written.
         // To enable for debugging: set textDataDeliveryEnabled to true and redeploy.
         textDataDeliveryEnabled:      false,
         imageDataDeliveryEnabled:     false,
         embeddingDataDeliveryEnabled: false,
+        videoDataDeliveryEnabled:     false,
       },
     };
 
