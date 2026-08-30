@@ -37,6 +37,7 @@ export interface Claim {
   requiresHumanReview?: boolean;
   priority?:           ClaimPriority | null;
   errorReason?:        string | null;
+  documents?:          { key: string; contentType: string; fileSizeBytes?: number }[];
   documentAnalyses?:   DocumentAnalysis[];
 }
 
