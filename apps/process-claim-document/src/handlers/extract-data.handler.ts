@@ -20,6 +20,7 @@ export const handler: Handler<AnalyzeDocumentInput, ExtractionResult> = async (e
 
   return {
     documentKey:        document.key,
+    contentType:        document.contentType,
     claimType:          extracted.claimType,
     estimatedAmount:    extracted.estimatedAmount,
     incidentDate:       extracted.incidentDate,

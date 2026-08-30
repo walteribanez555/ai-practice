@@ -37,6 +37,7 @@ export interface CheckCoverageInput {
 // ── Per-handler outputs ────────────────────────────────────────────────────────
 
 export interface ExtractionResult {
+  contentType:        string;
   documentKey:        string;
   claimType:          string | null;
   estimatedAmount:    number | null;

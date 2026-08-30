@@ -129,7 +129,7 @@ export const handler: Handler<AggregateRiskEvent> = async (event) => {
   // Build per-document analysis records
   const documentAnalyses: DocumentAnalysis[] = perDocResults.map(([ext, int]) => ({
     documentKey:         ext.documentKey,
-    contentType:         ext.documentKey.split('.').pop() ?? 'pdf',
+    contentType:         ext.contentType,
     claimType:           ext.claimType,
     estimatedAmount:     ext.estimatedAmount,
     incidentDate:        ext.incidentDate,
