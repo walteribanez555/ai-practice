@@ -27,14 +27,17 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 # ── SageMaker Processing Job: install packages not in the sklearn base container ──
 # The sklearn container already has: pandas, numpy, scikit-learn, boto3.
 # xgboost is NOT pre-installed — we install it here when running as a Processing Job.
 if os.getenv('IS_SAGEMAKER_JOB'):
     import subprocess
+    # xgboost 1.7.x is the last version compatible with the sklearn container's
+    # bundled pandas (< 1.5). xgboost 2.x requires Float32Dtype (pandas >= 1.5).
     subprocess.check_call([sys.executable, '-m', 'pip', 'install',
-                           'xgboost==2.1.3', '-q'])
+                           'xgboost==1.7.6', '-q'])
 
 import boto3
 import numpy as np
@@ -197,7 +200,7 @@ def evaluate(model: XGBClassifier, X_test, y_test) -> dict:
 
 # ── Previous model AUC (stored as metadata in S3) ────────────────────────────
 
-def get_previous_auc(s3, bucket: str) -> float | None:
+def get_previous_auc(s3, bucket: str) -> Optional[float]:
     key = 'fraud-scoring/model/metadata.json'
     try:
         obj = s3.get_object(Bucket=bucket, Key=key)
@@ -252,13 +255,13 @@ def package_and_upload(model: XGBClassifier, s3, bucket: str,
 # ── SageMaker deploy ──────────────────────────────────────────────────────────
 
 def deploy_endpoint(sm, s3_model_uri: str) -> None:
-    from sagemaker.image_uris import retrieve as get_uri
-
     ts          = datetime.utcnow().strftime('%Y%m%d-%H%M')
     model_name  = f'fraud-scoring-xgboost-{ts}'
     config_name = f'{ENDPOINT_NAME}-config-{ts}'
 
-    image = get_uri(framework='xgboost', region=REGION, version='1.7-1', image_scope='inference')
+    # XGBoost 1.7 inference image — account 683313688378 is AWS DLC for all regions
+    image = (os.getenv('XGBOOST_INFERENCE_IMAGE_URI')
+             or f'683313688378.dkr.ecr.{REGION}.amazonaws.com/sagemaker-xgboost:1.7-1')
 
     sm.create_model(
         ModelName=model_name,
