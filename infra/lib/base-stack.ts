@@ -307,11 +307,7 @@ export class AssistanceStack extends cdk.Stack {
         DOMAIN_ENDPOINT: osDomain.domainEndpoint,
         INDEX_NAME:      "policies-index",
       },
-      bundling: {
-        ...sharedBundling,
-        // aws4 is not @aws-sdk/* so it will be bundled; exclude nothing extra
-        nodeModules: ["aws4"],
-      },
+      bundling: sharedBundling, // aws4 is pure JS — esbuild bundles it from process-claim-document/node_modules
     });
     osDomain.grantReadWrite(osIndexFn);
 
@@ -587,8 +583,7 @@ export class AssistanceStack extends cdk.Stack {
         lambdaFunction:    checkCoverageFn,
         payloadResponseOnly: true,
         payload:           sfn.TaskInput.fromObject({
-          "claimId.$":  "$.claimId",
-          "policyId.$": "$.policyId",
+          "claimId.$": "$.claimId",
         }),
         comment: "Query Bedrock Knowledge Base to verify policy coverage",
       }),

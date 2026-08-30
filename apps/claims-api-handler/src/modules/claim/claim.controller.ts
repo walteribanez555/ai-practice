@@ -100,10 +100,11 @@ export const ClaimController = {
       stateMachineArn: SF_ARN,
       name:            `claim-${id}-${Date.now()}`,
       input:           JSON.stringify({
-        claimId:   claim.id,
-        clientId:  claim.clientId,
-        policyId:  claim.policyId,
+        claimId:  claim.id,
+        clientId: claim.clientId,
         documents,
+        // policyId omitted when undefined — Step Functions input must not contain undefined values
+        ...(claim.policyId ? { policyId: claim.policyId } : {}),
       }),
     }));
 
