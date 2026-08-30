@@ -2,6 +2,21 @@ export type ClaimStatus   = 'draft' | 'pending' | 'processing' | 'processed' | '
 export type ClaimPriority = 'high' | 'medium' | 'low';
 export type Coverage      = 'full' | 'partial' | 'none' | 'unknown';
 
+export interface DocumentAnalysis {
+  documentKey:         string;
+  contentType:         string;
+  claimType:           string | null;
+  estimatedAmount:     number | null;
+  incidentDate:        string | null;
+  involvedParties:     string[] | null;
+  descriptionSummary:  string | null;
+  lowQualityDocument:  boolean;
+  possibleAlteration:  boolean;
+  inconsistentParties: boolean;
+  observations:        string;
+  integrityScore:      number;
+}
+
 export interface Claim {
   id:                  string;
   status:              ClaimStatus;
@@ -22,6 +37,7 @@ export interface Claim {
   requiresHumanReview?: boolean;
   priority?:           ClaimPriority | null;
   errorReason?:        string | null;
+  documentAnalyses?:   DocumentAnalysis[];
 }
 
 export interface CreateClaimPayload {

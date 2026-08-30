@@ -11,6 +11,23 @@ export interface DocumentRef {
   fileSizeBytes?: number;
 }
 
+export interface DocumentAnalysis {
+  documentKey:         string;
+  contentType:         string;
+  // Extraction results
+  claimType:           string | null;
+  estimatedAmount:     number | null;
+  incidentDate:        string | null;
+  involvedParties:     string[] | null;
+  descriptionSummary:  string | null;
+  // Integrity results
+  lowQualityDocument:  boolean;
+  possibleAlteration:  boolean;
+  inconsistentParties: boolean;
+  observations:        string;
+  integrityScore:      number;
+}
+
 export interface Claim extends Record<string, unknown> {
   id: string;
   status: ClaimStatus;
@@ -22,6 +39,7 @@ export interface Claim extends Record<string, unknown> {
   contentType: string;
   fileSizeBytes: number;
   documents?: DocumentRef[];
+  documentAnalyses?: DocumentAnalysis[];
   // Extracted fields (absent = could not be read with confidence)
   claimType?: string;
   estimatedAmount?: number;
@@ -68,6 +86,7 @@ export type UpdateClaimInput = Partial<
     | 'errorReason'
     | 'processedAt'
     | 'updatedAt'
+    | 'documentAnalyses'
   >
 >;
 

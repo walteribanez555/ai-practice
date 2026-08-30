@@ -15,6 +15,7 @@
 
 import type { Handler } from 'aws-lambda';
 import { ClaimEntity } from '../orm/entities/claim.entity';
+import type { DocumentAnalysis } from '../orm/entities/claim.entity';
 import { createLogger } from '../config/logger';
 import type { AggregateRiskEvent, ExtractionResult, IntegrityResult } from './sf.types';
 
@@ -125,6 +126,22 @@ export const handler: Handler<AggregateRiskEvent> = async (event) => {
 
   logger.info('Risk aggregated', { claimId, fraudScore, requiresHumanReview, priority });
 
+  // Build per-document analysis records
+  const documentAnalyses: DocumentAnalysis[] = perDocResults.map(([ext, int]) => ({
+    documentKey:         ext.documentKey,
+    contentType:         ext.documentKey.split('.').pop() ?? 'pdf',
+    claimType:           ext.claimType,
+    estimatedAmount:     ext.estimatedAmount,
+    incidentDate:        ext.incidentDate,
+    involvedParties:     ext.involvedParties,
+    descriptionSummary:  ext.descriptionSummary,
+    lowQualityDocument:  int.lowQualityDocument,
+    possibleAlteration:  int.possibleAlteration,
+    inconsistentParties: int.inconsistentParties,
+    observations:        int.observations,
+    integrityScore:      int.integrityScore,
+  }));
+
   await ClaimEntity.update(claimId, {
     status:              'processed',
     claimType:           claimType           ?? undefined,
@@ -138,5 +155,6 @@ export const handler: Handler<AggregateRiskEvent> = async (event) => {
     requiresHumanReview,
     priority,
     processedAt:         new Date().toISOString(),
+    documentAnalyses,
   });
 };
