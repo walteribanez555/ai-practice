@@ -296,6 +296,13 @@ export class AssistanceStack extends cdk.Stack {
     // Grant KB role access to OpenSearch (resource-based policy + IAM)
     osDomain.grantReadWrite(kbRole);
 
+    // Bedrock needs these management API calls when validating the domain during KB creation
+    kbRole.addToPolicy(new iam.PolicyStatement({
+      sid:       "AllowOsDescribe",
+      actions:   ["es:DescribeDomain", "es:DescribeElasticsearchDomain"],
+      resources: [osDomain.domainArn],
+    }));
+
     // Custom Resource — creates the k-NN index before Bedrock KB ingests
     const osIndexFn = new lambdaNodejs.NodejsFunction(this, "OsIndexFn", {
       functionName: `${serviceName}-create-os-index`,

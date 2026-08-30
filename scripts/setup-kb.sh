@@ -148,12 +148,12 @@ CURRENT_ENV=$(aws lambda get-function-configuration \
   --output json)
 
 UPDATED_ENV=$(echo "$CURRENT_ENV" | \
-  python3 -c "import sys,json; e=json.load(sys.stdin); e['KNOWLEDGE_BASE_ID']='$KB_ID'; print(json.dumps(e))")
+  python3 -c "import sys,json; e=json.load(sys.stdin); e['KNOWLEDGE_BASE_ID']='$KB_ID'; print(json.dumps({'Variables': e}))")
 
 aws lambda update-function-configuration \
   --function-name "$FUNCTION" \
   --region "$REGION" \
-  --environment "Variables=$UPDATED_ENV" \
+  --environment "$UPDATED_ENV" \
   --query "FunctionName" \
   --output text
 
