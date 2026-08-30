@@ -3,6 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpEventType } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { DrawerComponent } from '../../../shared/components/drawer/drawer.component';
+import { DocumentDetailComponent } from '../document-detail/document-detail.component';
+import type { DocumentAnalysis } from '../claims.models';
 import { ClaimsService } from '../claims.service';
 import { AuthStore } from '../../auth/store/auth.store';
 import type { Claim, UpdateClaimPayload } from '../claims.models';
@@ -10,7 +13,7 @@ import type { Claim, UpdateClaimPayload } from '../claims.models';
 @Component({
   selector: 'app-claims-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, DrawerComponent, DocumentDetailComponent],
   templateUrl: './claims-detail.component.html',
 })
 export class ClaimsDetailComponent implements OnInit {
@@ -124,6 +127,17 @@ export class ClaimsDetailComponent implements OnInit {
   }
 
   get isDraft() { return this.claim()?.status === 'draft'; }
+
+  // Drawer
+  drawerOpen    = signal(false);
+  selectedDoc   = signal<DocumentAnalysis | null>(null);
+
+  openDocDrawer(doc: DocumentAnalysis) {
+    this.selectedDoc.set(doc);
+    this.drawerOpen.set(true);
+  }
+
+  closeDrawer() { this.drawerOpen.set(false); }
 
   onAddDocFile(event: Event) {
     const input = event.target as HTMLInputElement;

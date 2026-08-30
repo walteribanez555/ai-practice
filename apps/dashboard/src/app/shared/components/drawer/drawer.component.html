@@ -1,0 +1,33 @@
+@if (visible) {
+  <!-- Backdrop -->
+  <div
+    class="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300"
+    [class.opacity-0]="!animate"
+    [class.opacity-100]="animate"
+    (click)="close()">
+  </div>
+
+  <!-- Panel -->
+  <div
+    class="fixed inset-y-0 right-0 z-50 flex flex-col bg-white dark:bg-gray-900 shadow-2xl transition-transform duration-300 ease-in-out"
+    [style.width]="width"
+    [class.translate-x-full]="!animate"
+    [class.translate-x-0]="animate">
+
+    <!-- Header -->
+    <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+      <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ title }}</h2>
+      <button (click)="close()"
+              class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Content slot -->
+    <div class="flex-1 overflow-y-auto">
+      <ng-content/>
+    </div>
+  </div>
+}
