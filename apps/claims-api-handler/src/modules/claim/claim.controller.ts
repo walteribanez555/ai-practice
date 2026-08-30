@@ -1,13 +1,17 @@
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
+import { randomUUID } from 'crypto';
 import type { Context } from 'hono';
 import type { AppEnv } from '../../app.types';
 import { ClaimService } from './claim.service';
 import type { CreateClaimDto, UpdateClaimDto } from './claim.dto';
 import { toAdjusterResponse, toClientResponse } from './claim.dto';
 import { createLogger } from '../../config';
+import { S3Service } from '../../common/services/s3.service';
+import { ALLOWED_CONTENT_TYPES } from '../upload/upload.types';
 
 const sfnClient = new SFNClient({});
 const SF_ARN    = process.env.CLAIM_PROCESSING_SF_ARN ?? '';
+const s3        = new S3Service(process.env.DOCUMENTS_BUCKET_NAME ?? '');
 
 const logger = createLogger('ClaimController');
 
@@ -65,24 +69,22 @@ export const ClaimController = {
       return c.json({ error: 'fileSizeBytes must be greater than 0.', code: 'MISSING_FILE_SIZE' }, 400);
     }
 
-    // Client always creates for themselves; adjuster may specify a different clientId
     const clientId = role === 'client' ? userId : (body.clientId ?? userId);
 
-    logger.info('Claim create', { clientId, contentType: body.contentType });
+    const ct = body.contentType as keyof typeof ALLOWED_CONTENT_TYPES;
+    if (!ALLOWED_CONTENT_TYPES[ct]) {
+      return c.json({ error: `contentType must be one of: ${Object.keys(ALLOWED_CONTENT_TYPES).join(', ')}.`, code: 'INVALID_CONTENT_TYPE' }, 400);
+    }
 
-    const claim = await ClaimService.create({ ...body, clientId });
+    const mimeType   = ALLOWED_CONTENT_TYPES[ct];
+    const documentKey = `documents/${randomUUID()}`;
+    const uploadUrl   = await s3.getPresignedUploadUrl(documentKey, mimeType, 300);
 
-    // Auto-trigger processing immediately after creation
-    const documents = [{ key: claim.documentKey, contentType: claim.contentType, fileSizeBytes: claim.fileSizeBytes }];
-    await ClaimService.markProcessing(claim.id);
-    await sfnClient.send(new StartExecutionCommand({
-      stateMachineArn: SF_ARN,
-      name:            `claim-${claim.id}-${Date.now()}`,
-      input:           JSON.stringify({ claimId: claim.id, clientId: claim.clientId, documents }),
-    }));
-    logger.info('Auto-started claim processing', { id: claim.id });
+    logger.info('Claim create', { clientId, contentType: body.contentType, documentKey });
 
-    return c.json(toAdjusterResponse({ ...claim, status: 'processing' }), 201);
+    const claim = await ClaimService.create({ ...body, clientId, documentKey });
+
+    return c.json({ claim: toAdjusterResponse(claim), uploadUrl, documentKey, expiresIn: 300 }, 201);
   },
 
   // ── POST /claims/:id/process — adjuster only ─────────────────────────────

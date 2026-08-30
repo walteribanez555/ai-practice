@@ -14,6 +14,7 @@ import * as bedrock from "aws-cdk-lib/aws-bedrock";
 import * as cr from "aws-cdk-lib/custom-resources";
 import * as opensearch from "aws-cdk-lib/aws-opensearchservice";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as s3notifications from "aws-cdk-lib/aws-s3-notifications";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Construct } from "constructs";
@@ -109,6 +110,14 @@ export class AssistanceStack extends cdk.Stack {
       partitionKey:   { name: "priority",  type: dynamodb.AttributeType.STRING },
       sortKey:        { name: "createdAt", type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI for S3 trigger lookup: find claim by documentKey
+    this.claimsTable.addGlobalSecondaryIndex({
+      indexName:      "documentKey-index",
+      partitionKey:   { name: "documentKey", type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.INCLUDE,
+      nonKeyAttributes: ["id", "clientId", "status", "contentType", "fileSizeBytes"],
     });
 
     // ─── S3 — claim documents bucket ──────────────────────────────────────────
@@ -625,6 +634,56 @@ export class AssistanceStack extends cdk.Stack {
       description: "ARN of the claim processing Step Functions state machine",
       exportName:  `${serviceName}-claim-processing-sfn-arn`,
     });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Lambda 3 — s3-trigger (S3 ObjectCreated → start claim processing)
+    //
+    // Triggered when a document lands in the documents bucket.
+    // Looks up the claim by documentKey GSI, marks it processing,
+    // and starts the Step Function execution.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const s3TriggerRole = new iam.Role(this, "S3TriggerRole", {
+      roleName:        `${serviceName}-s3-trigger-role`,
+      assumedBy:       new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole")],
+    });
+    s3TriggerRole.addToPolicy(new iam.PolicyStatement({
+      sid:     "AllowClaimsTableAccess",
+      actions: ["dynamodb:Query", "dynamodb:UpdateItem"],
+      resources: [
+        this.claimsTable.tableArn,
+        `${this.claimsTable.tableArn}/index/documentKey-index`,
+      ],
+    }));
+    s3TriggerRole.addToPolicy(new iam.PolicyStatement({
+      sid:       "AllowStartSfn",
+      actions:   ["states:StartExecution"],
+      resources: [claimProcessingStateMachine.stateMachineArn],
+    }));
+
+    const s3TriggerFn = new lambdaNodejs.NodejsFunction(this, "S3TriggerFn", {
+      functionName: `${serviceName}-s3-trigger`,
+      description:  "S3 ObjectCreated → find claim by documentKey → start claim processing SF",
+      runtime:      lambda.Runtime.NODEJS_22_X,
+      entry:        path.join(__dirname, "../../apps/claims-api-handler/src/handlers/s3-trigger.handler.ts"),
+      handler:      "handler",
+      role:         s3TriggerRole,
+      timeout:      cdk.Duration.seconds(30),
+      memorySize:   256,
+      environment: {
+        CLAIMS_TABLE_NAME:       this.claimsTable.tableName,
+        CLAIM_PROCESSING_SF_ARN: claimProcessingStateMachine.stateMachineArn,
+      },
+      bundling: sharedBundling,
+    });
+
+    // S3 event notification: ObjectCreated → s3TriggerFn
+    documentsBucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3notifications.LambdaDestination(s3TriggerFn),
+      { prefix: "documents/" },
+    );
 
     // ─────────────────────────────────────────────────────────────────────────
     // Lambda 2 — claims-api-handler (external, with API Gateway)

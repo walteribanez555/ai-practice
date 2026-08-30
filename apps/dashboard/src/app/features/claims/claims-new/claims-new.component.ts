@@ -55,28 +55,24 @@ export class ClaimsNewComponent {
     this.errorMsg.set(null);
     const ct = this.contentType();
 
-    this.claimsService.presign(ct).subscribe({
-      next: ({ documentKey, uploadUrl, mimeType }) => {
-        this.claimsService.uploadToS3(uploadUrl, file, mimeType).subscribe({
+    // 1. Create claim record — API returns presigned URL
+    this.claimsService.create({ contentType: ct, fileSizeBytes: file.size }).subscribe({
+      next: ({ uploadUrl }) => {
+        // 2. Upload document to S3 — S3 trigger starts processing automatically
+        this.claimsService.uploadToS3(uploadUrl, file, this.mimeMap[ct]).subscribe({
           next: (ev) => {
             if (ev.type === HttpEventType.UploadProgress && ev.total) {
               this.uploadPct.set(Math.round(100 * ev.loaded / ev.total));
             }
             if (ev.type === HttpEventType.Response) {
-              this.claimsService.create({
-                documentKey,
-                contentType: ct,
-                fileSizeBytes: file.size,
-              }).subscribe({
-                next:  () => { this.step.set('done'); setTimeout(() => this.router.navigate(['/dashboard/claims']), 1500); },
-                error: (e) => { this.step.set('error'); this.errorMsg.set(e?.error?.error ?? 'Error al crear la reclamación.'); },
-              });
+              this.step.set('done');
+              setTimeout(() => this.router.navigate(['/dashboard/claims']), 1500);
             }
           },
           error: () => { this.step.set('error'); this.errorMsg.set('Error al subir el archivo a S3.'); },
         });
       },
-      error: (e) => { this.step.set('error'); this.errorMsg.set(e?.error?.error ?? 'Error al obtener URL de subida.'); },
+      error: (e) => { this.step.set('error'); this.errorMsg.set(e?.error?.error ?? 'Error al crear la reclamación.'); },
     });
   }
 
