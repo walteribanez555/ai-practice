@@ -1556,43 +1556,62 @@ export class AssistanceStack extends cdk.Stack {
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // HIPAA — Bedrock Model Invocation Logging Opt-Out
+    // HIPAA — Bedrock Model Invocation Logging — explicit opt-out
     //
-    // AWS Bedrock does NOT use customer data for model training by default.
-    // This custom resource explicitly disables model invocation logging so
-    // that prompt contents (which may contain PHI) are never written to S3
-    // or CloudWatch by the Bedrock service itself.
+    // The Bedrock PutModelInvocationLoggingConfiguration API requires at least
+    // one destination config (cloudWatchConfig or s3Config) — it does not accept
+    // an empty loggingConfig. The workaround: provide a valid CloudWatch
+    // destination but set all three *DataDeliveryEnabled flags to false.
+    // Result: destination is configured, zero data is delivered.
     //
-    // This configuration is intentional and auditable via CloudFormation state.
-    // If logging is needed for debugging, enable only to CloudWatch Logs
-    // (covered under the AWS BAA) — never to S3 without encryption controls.
+    // This creates an auditable CloudFormation-managed state: any future change
+    // to enable logging will appear as a stack drift or changeset — intentional.
     // ─────────────────────────────────────────────────────────────────────────
+
+    // Dedicated log group — exists as the registered destination even though
+    // nothing is delivered. Kept at 1 week; if delivery is ever enabled for
+    // debugging, logs auto-expire quickly.
+    const bedrockInvocationLogGroup = new logs.LogGroup(this, "BedrockInvocationLogGroup", {
+      logGroupName:  `/aws/bedrock/model-invocations/${this.appEnv}`,
+      retention:     logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // IAM role Bedrock assumes when writing to CloudWatch (required by the API
+    // even when delivery is disabled — the principal must exist and be trustable).
+    const bedrockLoggingRole = new iam.Role(this, "BedrockLoggingRole", {
+      roleName:  `${serviceName}-bedrock-logging-role`,
+      assumedBy: new iam.ServicePrincipal("bedrock.amazonaws.com"),
+    });
+    bedrockInvocationLogGroup.grantWrite(bedrockLoggingRole);
+
+    const bedrockLoggingParams = {
+      loggingConfig: {
+        cloudWatchConfig: {
+          logGroupName: bedrockInvocationLogGroup.logGroupName,
+          roleArn:      bedrockLoggingRole.roleArn,
+        },
+        // All three delivery flags OFF — destination exists but nothing is written.
+        // To enable for debugging: set textDataDeliveryEnabled to true and redeploy.
+        textDataDeliveryEnabled:      false,
+        imageDataDeliveryEnabled:     false,
+        embeddingDataDeliveryEnabled: false,
+      },
+    };
 
     new cr.AwsCustomResource(this, "BedrockLoggingOptOut", {
       resourceType: "Custom::BedrockLoggingOptOut",
       onCreate: {
         service:            "Bedrock",
         action:             "putModelInvocationLoggingConfiguration",
-        parameters: {
-          loggingConfig: {
-            textDataDeliveryEnabled:      false,
-            imageDataDeliveryEnabled:     false,
-            embeddingDataDeliveryEnabled: false,
-          },
-        },
+        parameters:         bedrockLoggingParams,
         physicalResourceId: cr.PhysicalResourceId.of("bedrock-logging-opt-out"),
         region:             this.region,
       },
       onUpdate: {
         service:            "Bedrock",
         action:             "putModelInvocationLoggingConfiguration",
-        parameters: {
-          loggingConfig: {
-            textDataDeliveryEnabled:      false,
-            imageDataDeliveryEnabled:     false,
-            embeddingDataDeliveryEnabled: false,
-          },
-        },
+        parameters:         bedrockLoggingParams,
         physicalResourceId: cr.PhysicalResourceId.of("bedrock-logging-opt-out"),
         region:             this.region,
       },
@@ -1605,8 +1624,8 @@ export class AssistanceStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "BedrockLoggingStatus", {
-      value:       "DISABLED — model invocation logging explicitly off via CDK custom resource",
-      description: "Bedrock model invocation logging status (HIPAA: PHI not written to S3/CW by Bedrock)",
+      value:       `DELIVERY DISABLED — destination ${bedrockInvocationLogGroup.logGroupName} registered but textDataDelivery=false imageDataDelivery=false embeddingDataDelivery=false`,
+      description: "Bedrock invocation logging state (HIPAA: no PHI written — auditable via CloudFormation)",
     });
 
     new cdk.CfnOutput(this, "MlBucketName", {
