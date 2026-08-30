@@ -579,7 +579,8 @@ export class AssistanceStack extends cdk.Stack {
       comment:           "Merge all analyses into composite fraud score and update DynamoDB",
     });
 
-    // Error catch — resultPath merges error info into the original input so $.claimId is still accessible
+    // Error catch — resultPath merges error info into the original input so $.claimId is still accessible.
+    // handleError routes to aggregateRiskTask so the claim is marked as error in DynamoDB.
     const handleError = new sfn.Pass(this, "PropagateError", {
       parameters: {
         "claimId.$": "$.claimId",
@@ -588,6 +589,7 @@ export class AssistanceStack extends cdk.Stack {
       },
       comment: "Capture error details for downstream logging",
     });
+    handleError.next(aggregateRiskTask);
 
     const definition = topParallel
       .addCatch(handleError, { errors: ["States.ALL"], resultPath: "$.sfnError" })

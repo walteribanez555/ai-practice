@@ -86,6 +86,17 @@ function computeFraudScore(
 
 export const handler: Handler<AggregateRiskEvent> = async (event) => {
   const { claimId, analysisResults } = event;
+
+  // Error path: PropagateError forwards { claimId, error, cause } when a branch fails
+  if (!analysisResults) {
+    const { error, cause } = event as unknown as { error: string; cause: string };
+    let errorReason = error;
+    try { errorReason = (JSON.parse(cause) as { errorMessage?: string }).errorMessage ?? error; } catch { /* keep raw */ }
+    logger.warn('Claim analysis failed — marking as error', { claimId, error });
+    await ClaimEntity.update(claimId, { status: 'error', errorReason, processedAt: new Date().toISOString() });
+    return;
+  }
+
   const [perDocResults, history, coverage] = analysisResults;
 
   logger.info('Aggregating risk', { claimId, documentCount: perDocResults.length });
