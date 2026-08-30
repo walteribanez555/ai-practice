@@ -305,7 +305,7 @@
           </div>
 
           @if (processMsg()) {
-            <p class="mt-3 text-sm" [class]="processMsg()!.includes('correctamente') || includes('started') || includes('Analysis') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+            <p class="mt-3 text-sm" [class]="processMsg()!.includes('Analysis') || processMsg()!.includes('started') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
               {{ processMsg() }}
             </p>
           }
@@ -348,7 +348,7 @@
             </div>
 
             @if (updateMsg()) {
-              <p class="mt-3 text-sm" [class]="updateMsg()!.includes('correctamente') || includes('started') || includes('Analysis') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+              <p class="mt-3 text-sm" [class]="updateMsg()!.includes('correctamente') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
                 {{ updateMsg() }}
               </p>
             }
