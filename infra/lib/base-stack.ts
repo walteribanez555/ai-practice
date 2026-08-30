@@ -9,6 +9,10 @@ import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as bedrock from "aws-cdk-lib/aws-bedrock";
+import * as cr from "aws-cdk-lib/custom-resources";
+import * as opensearch from "aws-cdk-lib/aws-opensearchservice";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Construct } from "constructs";
@@ -233,6 +237,165 @@ export class AssistanceStack extends cdk.Stack {
     });
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Knowledge Base — OpenSearch Service + Bedrock KB + policy documents
+    //
+    // Flow: S3(policies) → Bedrock ingestion → OpenSearch index (k-NN vectors)
+    //       check-coverage Lambda → bedrock:Retrieve → top-k chunks → coverage decision
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // S3 — policy documents source
+    const policiesBucket = new s3.Bucket(this, "PoliciesBucket", {
+      bucketName:        `${serviceName}-policies`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL:        true,
+      removalPolicy:     isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: !isProd,
+    });
+
+    // Upload policy .txt files on every deploy
+    new s3deploy.BucketDeployment(this, "PolicyDocs", {
+      sources:           [s3deploy.Source.asset(path.join(__dirname, "../../knowledge_base/policies"))],
+      destinationBucket: policiesBucket,
+    });
+
+    // IAM role for Bedrock Knowledge Base
+    const kbRole = new iam.Role(this, "KnowledgeBaseRole", {
+      roleName:  `${serviceName}-kb-role`,
+      assumedBy: new iam.ServicePrincipal("bedrock.amazonaws.com", {
+        conditions: {
+          StringEquals: { "aws:SourceAccount": this.account },
+          ArnLike: { "aws:SourceArn": `arn:aws:bedrock:${this.region}:${this.account}:knowledge-base/*` },
+        },
+      }),
+    });
+    policiesBucket.grantRead(kbRole);
+
+    // OpenSearch Service domain — t3.small.search, 1 node, 10 GB (~$4.55 / 5 days)
+    const osDomainName = `${serviceName.substring(0, 24)}-kb`;
+    const osDomain = new opensearch.Domain(this, "PoliciesDomain", {
+      domainName:          osDomainName,
+      version:             opensearch.EngineVersion.OPENSEARCH_2_11,
+      capacity: {
+        dataNodes:                1,
+        dataNodeInstanceType:     "t3.small.search",
+        multiAzWithStandbyEnabled: false,
+      },
+      ebs:                 { volumeSize: 10 },
+      encryptionAtRest:    { enabled: true },
+      nodeToNodeEncryption: true,
+      enforceHttps:        true,
+      removalPolicy:       cdk.RemovalPolicy.DESTROY,
+      logging: {
+        slowSearchLogEnabled: false,
+        slowIndexLogEnabled:  false,
+      },
+    });
+
+    // Grant KB role access to OpenSearch (resource-based policy + IAM)
+    osDomain.grantReadWrite(kbRole);
+
+    // Custom Resource — creates the k-NN index before Bedrock KB ingests
+    const osIndexFn = new lambdaNodejs.NodejsFunction(this, "OsIndexFn", {
+      functionName: `${serviceName}-create-os-index`,
+      description:  "CDK custom resource — creates k-NN vector index in OpenSearch",
+      runtime:      lambda.Runtime.NODEJS_22_X,
+      entry:        path.join(__dirname, "../../apps/process-claim-document/src/handlers/create-os-index.handler.ts"),
+      handler:      "handler",
+      timeout:      cdk.Duration.minutes(5),
+      memorySize:   256,
+      environment: {
+        DOMAIN_ENDPOINT: osDomain.domainEndpoint,
+        INDEX_NAME:      "policies-index",
+      },
+      bundling: {
+        ...sharedBundling,
+        // aws4 is not @aws-sdk/* so it will be bundled; exclude nothing extra
+        nodeModules: ["aws4"],
+      },
+    });
+    osDomain.grantReadWrite(osIndexFn);
+
+    const osIndexProvider = new cr.Provider(this, "OsIndexProvider", {
+      onEventHandler: osIndexFn,
+    });
+
+    const osIndexResource = new cdk.CustomResource(this, "OsIndex", {
+      serviceToken: osIndexProvider.serviceToken,
+      properties: {
+        DomainEndpoint: osDomain.domainEndpoint,
+        IndexName:      "policies-index",
+        Version:        "1",
+      },
+    });
+
+    // Bedrock Knowledge Base pointing to OpenSearch managed cluster
+    const policiesKb = new bedrock.CfnKnowledgeBase(this, "PoliciesKB", {
+      name:    `${serviceName}-policies-kb`,
+      roleArn: kbRole.roleArn,
+      knowledgeBaseConfiguration: {
+        type: "VECTOR",
+        vectorKnowledgeBaseConfiguration: {
+          embeddingModelArn: `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+        },
+      },
+      storageConfiguration: {
+        type: "OPENSEARCH_MANAGED_CLUSTER",
+        opensearchManagedClusterConfiguration: {
+          domainArn:       osDomain.domainArn,
+          domainEndpoint:  `https://${osDomain.domainEndpoint}`,
+          vectorIndexName: "policies-index",
+          fieldMapping: {
+            vectorField:   "bedrock-knowledge-base-default-vector",
+            textField:     "AMAZON_BEDROCK_TEXT_CHUNK",
+            metadataField: "AMAZON_BEDROCK_METADATA",
+          },
+        },
+      },
+    });
+    // KB must wait for the index to exist before creation
+    policiesKb.node.addDependency(osIndexResource);
+
+    // Data source — S3 bucket with policy documents, chunked at 512 tokens
+    new bedrock.CfnDataSource(this, "PoliciesDataSource", {
+      knowledgeBaseId: policiesKb.attrKnowledgeBaseId,
+      name:            `${serviceName}-policies-docs`,
+      dataSourceConfiguration: {
+        type: "S3",
+        s3Configuration: { bucketArn: policiesBucket.bucketArn },
+      },
+      vectorIngestionConfiguration: {
+        chunkingConfiguration: {
+          chunkingStrategy: "FIXED_SIZE",
+          fixedSizeChunkingConfiguration: {
+            maxTokens:          512,
+            overlapPercentage:  20,
+          },
+        },
+      },
+    });
+
+    // Allow Bedrock KB to read S3 (Titan embedding calls go through Bedrock service)
+    kbRole.addToPolicy(new iam.PolicyStatement({
+      sid:     "AllowTitanEmbedding",
+      actions: ["bedrock:InvokeModel"],
+      resources: [
+        `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+      ],
+    }));
+
+    new cdk.CfnOutput(this, "KnowledgeBaseId", {
+      value:       policiesKb.attrKnowledgeBaseId,
+      description: "Bedrock Knowledge Base ID — use to start ingestion job",
+      exportName:  `${serviceName}-knowledge-base-id`,
+    });
+
+    new cdk.CfnOutput(this, "OpenSearchDomainEndpoint", {
+      value:       osDomain.domainEndpoint,
+      description: "OpenSearch domain endpoint",
+      exportName:  `${serviceName}-opensearch-endpoint`,
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Step Functions — claim processing state machine
     //
     // Parallel analysis of multiple documents per claim:
@@ -240,7 +403,7 @@ export class AssistanceStack extends cdk.Stack {
     //                 extract-data  (Bedrock: structured extraction)
     //                 analyze-integrity (Bedrock: forgery signals)
     //   Branch B → check-history    (DynamoDB: client claim history)
-    //   Branch C → check-coverage   (Bedrock KB stub: policy coverage)
+    //   Branch C → check-coverage   (Bedrock KB: policy coverage via RAG)
     //   Final    → aggregate-risk   (merges all outputs → DynamoDB update)
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -266,7 +429,7 @@ export class AssistanceStack extends cdk.Stack {
     documentsBucket.grantRead(sfDocAnalysisRole);
     appSecret.grantRead(sfDocAnalysisRole);
 
-    // IAM role for history/coverage Lambdas (DynamoDB read only)
+    // IAM role for history/coverage Lambdas (DynamoDB read + Bedrock Retrieve)
     const sfQueryRole = new iam.Role(this, "SfQueryRole", {
       roleName:        `${serviceName}-sf-query-role`,
       assumedBy:       new iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -276,6 +439,11 @@ export class AssistanceStack extends cdk.Stack {
       sid:     "AllowDynamoRead",
       actions: ["dynamodb:GetItem", "dynamodb:Query"],
       resources: [this.claimsTable.tableArn, `${this.claimsTable.tableArn}/index/*`],
+    }));
+    sfQueryRole.addToPolicy(new iam.PolicyStatement({
+      sid:     "AllowBedrockRetrieve",
+      actions: ["bedrock:Retrieve"],
+      resources: [policiesKb.attrKnowledgeBaseArn],
     }));
     appSecret.grantRead(sfQueryRole);
 
@@ -337,14 +505,17 @@ export class AssistanceStack extends cdk.Stack {
 
     const checkCoverageFn = new lambdaNodejs.NodejsFunction(this, "CheckCoverageFn", {
       functionName: `${serviceName}-check-coverage`,
-      description:  "SF step — check policy coverage (stub; will use Bedrock KB)",
+      description:  "SF step — check policy coverage via Bedrock Knowledge Base (RAG)",
       runtime:      lambda.Runtime.NODEJS_22_X,
       entry:        path.join(__dirname, `${handlersBase}/check-coverage.handler.ts`),
       handler:      "handler",
       role:         sfQueryRole,
-      timeout:      cdk.Duration.seconds(15),
+      timeout:      cdk.Duration.seconds(30),
       memorySize:   256,
-      environment:  sharedEnv,
+      environment: {
+        ...sharedEnv,
+        KNOWLEDGE_BASE_ID: policiesKb.attrKnowledgeBaseId,
+      },
       bundling:     sharedBundling,
     });
 

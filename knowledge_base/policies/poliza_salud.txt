@@ -1,0 +1,79 @@
+POLIZA DE SEGURO DE SALUD — CONDICIONES GENERALES
+Producto: SaludTotal | Version: 2026-01
+
+== SECCION 1 — DEFINICIONES ==
+
+Titular: persona principal cubierta por la poliza.
+Beneficiario: familiar directo incluido en la cobertura (conyugue, hijos hasta 25 anos).
+Preexistencia: condicion medica diagnosticada antes de la contratacion de la poliza.
+Hospitalizacion: internacion en centro medico autorizado por mas de 12 horas continuas.
+Emergencia: condicion medica que pone en riesgo inmediato la vida del asegurado.
+
+== SECCION 2 — COBERTURAS INCLUIDAS ==
+
+2.1 Hospitalizacion
+Cubre internacion en hospital de la red de prestadores por enfermedad o accidente.
+Incluye: habitacion estandar, alimentacion, enfermeria, medicamentos durante internacion.
+Limite anual: USD 150,000 por beneficiario.
+Franquicia: 10% del costo total, maximo USD 1,000 por evento.
+
+2.2 Cirugia
+Cubre honorarios del cirujano, anestesista, ayudante de cirugia y uso de quirofano.
+Aplica para cirugia programada y de emergencia.
+Limite: segun tabla quirurgica adjunta (Anexo A). Franquicia: incluida en la de hospitalizacion.
+
+2.3 Consultas Medicas
+Cubre consultas con medicos de la red de prestadores. Limite: 20 consultas anuales por beneficiario.
+Especialidades cubiertas: clinica general, cardiologia, traumatologia, dermatologia,
+ginecologia, pediatria, neurologia, psiquiatria (hasta 10 sesiones anuales).
+
+2.4 Estudios Diagnosticos
+Cubre examenes de laboratorio, radiografias, ecografias, resonancias magneticas y tomografias.
+Requieren orden medica previa. Limite anual: USD 5,000 por beneficiario.
+
+2.5 Medicamentos
+Cubre medicamentos recetados durante hospitalizacion (100%) y ambulatorios (50% hasta USD 2,000 anuales).
+Solo aplica para medicamentos con receta medica emitida por profesional de la red.
+
+2.6 Urgencias y Emergencias
+Cubre atencion de urgencia en guardia hospitalaria, incluyendo prestadores fuera de la red
+cuando no hay red disponible. Limite por evento de urgencia: USD 10,000.
+
+2.7 Maternidad (cobertura opcional activada en esta poliza)
+Cubre parto normal y por cesarea, controles prenatales y posnatales.
+Periodo de espera: 10 meses desde la contratacion o desde el inicio de la cobertura de maternidad.
+Limite: USD 8,000 por evento.
+
+== SECCION 3 — EXCLUSIONES ==
+
+3.1 Enfermedades preexistentes declaradas o no declaradas en los primeros 12 meses de vigencia.
+3.2 Tratamientos esteticos o de belleza sin indicacion medica de necesidad clinica.
+3.3 Tratamientos experimentales o no aprobados por la autoridad sanitaria local.
+3.4 Lesiones autoinfligidas o intentos de suicidio.
+3.5 Tratamientos relacionados con adicciones (alcohol, drogas) salvo programa de desintoxicacion aprobado.
+3.6 Odontologia general (solo cubierta en plan premium).
+3.7 Fertilizacion in vitro y tecnicas de reproduccion asistida.
+3.8 Gastos de transporte ambulatorio no autorizado previamente por la aseguradora.
+
+== SECCION 4 — PERIODOS DE ESPERA ==
+
+Hospitalizacion general: 30 dias desde contratacion.
+Cirugia programada: 60 dias desde contratacion.
+Enfermedades cronicas (diabetes, hipertension): 180 dias desde contratacion.
+Maternidad: 10 meses desde activacion de cobertura.
+Emergencias: sin periodo de espera.
+
+== SECCION 5 — PROCEDIMIENTO DE RECLAMO ==
+
+5.1 Para hospitalizacion programada: solicitar autorizacion previa con 48 horas de anticipacion.
+5.2 Para emergencias: notificar dentro de las 24 horas de la atencion.
+5.3 Documentacion requerida: facturas originales del prestador, epicrisis medica,
+    ordenes medicas y recetas en caso de medicamentos.
+5.4 Reintegro de gastos en prestadores fuera de red: hasta el 70% del arancel de referencia.
+5.5 Plazo de pago: 20 dias habiles desde recepcion de documentacion completa.
+
+== SECCION 6 — RED DE PRESTADORES ==
+
+La poliza incluye acceso a mas de 500 clinicas y hospitales en la red nacional.
+El uso de la red garantiza cobertura sin desembolso inicial (modalidad cashless).
+El uso fuera de red implica pago adelantado y posterior reintegro parcial.

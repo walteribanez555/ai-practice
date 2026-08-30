@@ -28,8 +28,9 @@ export interface CheckHistoryInput {
 }
 
 export interface CheckCoverageInput {
-  claimId:   string;
-  policyId?: string;
+  claimId:       string;
+  policyId?:     string;
+  claimContext?: string;  // free-text hint for the KB query (e.g. "auto colision")
 }
 
 // ── Per-handler outputs ────────────────────────────────────────────────────────

@@ -1,0 +1,68 @@
+POLIZA DE SEGURO AUTOMOTRIZ — CONDICIONES GENERALES
+Producto: SeguroAuto Plus | Version: 2026-01
+
+== SECCION 1 — DEFINICIONES ==
+
+Asegurado: persona titular del vehiculo registrado en la poliza.
+Tercero: cualquier persona ajena al asegurado involucrada en un siniestro.
+Siniestro: evento accidental que genera perdida o dano cubierto por esta poliza.
+Valor asegurado: monto maximo de indemnizacion por evento, segun tabla de cobertura.
+Franquicia: monto a cargo del asegurado antes de que la cobertura aplique.
+
+== SECCION 2 — COBERTURAS INCLUIDAS ==
+
+2.1 Danos por Colision
+Cubre danos materiales al vehiculo asegurado causados por colision con otro vehiculo,
+objeto fijo o vuelco. Aplica independientemente de quien sea el responsable del accidente.
+Limite: USD 50,000 por evento. Franquicia: USD 500.
+
+2.2 Responsabilidad Civil ante Terceros
+Cubre danos materiales y lesiones corporales causados a terceros por el vehiculo asegurado.
+Limite danos materiales: USD 100,000. Limite lesiones: USD 200,000 por evento.
+No aplica franquicia para este rubro.
+
+2.3 Robo Total del Vehiculo
+Cubre la perdida total del vehiculo por robo debidamente denunciado ante autoridad competente.
+Se requiere denuncia policial dentro de las 24 horas del evento.
+Indemnizacion: valor comercial del vehiculo al momento del robo, menos depreciacion anual del 10%.
+
+2.4 Danos por Fenomenos Naturales
+Cubre danos causados por granizo, inundacion, rayo, terremoto o deslizamiento de tierra.
+Limite: USD 30,000. Franquicia: USD 300.
+
+2.5 Robo de Accesorios
+Cubre robo de accesorios de fabrica instalados en el vehiculo (radio, airbags, ruedas de aleacion).
+Limite: USD 5,000. No cubre accesorios no originales de fabrica.
+
+== SECCION 3 — COBERTURAS OPCIONALES ==
+
+3.1 Asistencia en Ruta
+Grua, cambio de neumatico, carga de bateria y provision de combustible. Disponible 24/7.
+
+3.2 Auto de Reemplazo
+Vehiculo sustituto por hasta 15 dias mientras el asegurado este en reparacion o tramite de robo.
+
+== SECCION 4 — EXCLUSIONES ==
+
+Las siguientes situaciones NO estan cubiertas bajo ninguna circunstancia:
+
+4.1 El asegurado conduzca bajo efecto de alcohol (BAC superior a 0.05%) o sustancias ilicitas.
+4.2 El vehiculo participe en competencias de velocidad, carreras o pruebas de manejo deportivo.
+4.3 Danos causados intencionalmente por el asegurado o personas de su grupo familiar.
+4.4 Danos por desgaste normal, corrosion o falta de mantenimiento del vehiculo.
+4.5 Uso del vehiculo con fines comerciales no declarados al momento de la contratacion.
+4.6 Siniestros ocurridos fuera del territorio nacional sin extension de cobertura contratada.
+4.7 Robo parcial de piezas mecanicas del motor.
+
+== SECCION 5 — PROCEDIMIENTO DE RECLAMO ==
+
+5.1 Notificar el siniestro dentro de las 72 horas de ocurrido al numero 1-800-SEGURO.
+5.2 Presentar: denuncia policial (si aplica), fotos del vehiculo, croquis del accidente,
+    cedula de identidad del conductor y datos del tercero involucrado.
+5.3 El perito evaluador visitara el vehiculo en un plazo maximo de 48 horas habiles.
+5.4 El pago de la indemnizacion se realizara en un plazo de 15 dias habiles tras aprobacion.
+
+== SECCION 6 — VIGENCIA Y RENOVACION ==
+
+La poliza tiene vigencia anual. La renovacion es automatica salvo aviso con 30 dias de anticipacion.
+La prima se ajusta anualmente segun historial de siniestros y valor comercial del vehiculo.

@@ -1,0 +1,83 @@
+POLIZA DE SEGURO DE HOGAR — CONDICIONES GENERALES
+Producto: HogarSeguro | Version: 2026-01
+
+== SECCION 1 — DEFINICIONES ==
+
+Inmueble asegurado: propiedad registrada en la poliza (vivienda principal o secundaria).
+Contenido: bienes muebles dentro del inmueble (electrodomesticos, muebles, ropa, electronicos).
+Dano estructural: dano que afecta la estructura portante, muros, techo o instalaciones fijas.
+Tercero: persona ajena al asegurado que sufra dano en relacion al inmueble asegurado.
+
+== SECCION 2 — COBERTURAS INCLUIDAS ==
+
+2.1 Incendio y Explosion
+Cubre danos totales o parciales al inmueble y su contenido causados por incendio, explosion de gas
+o cortocircuito electrico. Incluye gastos de demolicion y remocion de escombros.
+Limite inmueble: USD 200,000. Limite contenido: USD 30,000. Sin franquicia.
+
+2.2 Robo con Violencia
+Cubre sustraccion de bienes del interior del inmueble cuando existe evidencia de forzamiento
+(vidrios rotos, cerraduras danadas, reporte policial de allanamiento).
+Limite: USD 20,000. Franquicia: USD 300. Requiere denuncia policial.
+
+2.3 Danos por Agua
+Cubre danos causados por ruptura de canerias internas, desborde de sanitarios, filtracion
+de agua de lluvia por defecto en techo o paredes, o inundacion por desborde de rio o canal.
+Limite: USD 15,000. Franquicia: USD 200.
+Exclusion: danos por humedad cronica o condensacion sin evento puntual identificable.
+
+2.4 Danos por Fenomenos Naturales
+Cubre danos causados por terremoto, viento huracanado (vientos superiores a 80 km/h),
+granizo, rayo, derrumbe o deslizamiento de tierra.
+Limite: USD 100,000. Franquicia: 5% del dano, minimo USD 500.
+
+2.5 Responsabilidad Civil del Hogar
+Cubre reclamos de terceros por danos corporales o materiales ocurridos dentro o en los
+alrededores del inmueble asegurado (por ejemplo, caida de una persona en la propiedad,
+dano a vecinos por filtracion de agua originada en el inmueble asegurado).
+Limite: USD 50,000 por evento. Sin franquicia.
+
+2.6 Cristales y Vidrios
+Cubre rotura accidental de vidrios, espejos y vitroceramicas.
+Limite: USD 2,000 por evento. Franquicia: USD 100.
+
+2.7 Equipos Electronicos
+Cubre danos accidentales a computadoras, televisores y electrodomesticos por sobretension electrica.
+Limite: USD 5,000. Franquicia: USD 150. No aplica a equipos con mas de 5 anos de uso.
+
+== SECCION 3 — COBERTURAS OPCIONALES ==
+
+3.1 Asistencia en el Hogar
+Servicio de plomeria, electricidad, cerrajeria y vidrieria de emergencia. Disponible 24/7.
+Incluye hasta 2 horas de mano de obra por evento, hasta 6 eventos anuales.
+
+3.2 Contenido de Alto Valor
+Cubre joyas, obras de arte, colecciones y objetos de valor declarados individualmente.
+Prima adicional segun tasacion. Requiere declaracion e inventario previo.
+
+== SECCION 4 — EXCLUSIONES ==
+
+4.1 Danos causados por el desgaste normal, falta de mantenimiento o vejez del inmueble.
+4.2 Danos esteticos sin compromiso funcional (rayones superficiales, pintura descascarada por tiempo).
+4.3 Robo sin evidencia de forzamiento o acceso violento al inmueble.
+4.4 Danos causados por animales domesticos del asegurado.
+4.5 Guerra, terrorismo, actos de vandalismo masivo o disturbios civiles.
+4.6 Inmuebles desocupados por mas de 60 dias consecutivos sin notificacion a la aseguradora.
+4.7 Danos a vehiculos dentro del garage (cubiertos por poliza automotriz separada).
+4.8 Contenidos de negocio o inventarios comerciales almacenados en el inmueble.
+
+== SECCION 5 — PROCEDIMIENTO DE RECLAMO ==
+
+5.1 Notificar el siniestro dentro de las 24 horas a traves de la app o al 1-800-HOGAR.
+5.2 Conservar los bienes danados hasta la visita del perito (no tirar ni reparar sin autorizacion).
+5.3 En caso de robo: presentar denuncia policial original dentro de las 48 horas.
+5.4 Documentacion: fotos del dano, facturas de compra de bienes afectados (si disponibles),
+    presupuesto de reparacion de al menos un proveedor habilitado.
+5.5 Plazo de peritaje: 5 dias habiles desde la notificacion.
+5.6 Plazo de pago: 20 dias habiles desde la aprobacion del peritaje.
+
+== SECCION 6 — ACTUALIZACION DEL VALOR ASEGURADO ==
+
+El valor asegurado del inmueble se actualiza automaticamente cada ano segun el indice
+de costo de construccion publicado por la Camara de la Construccion.
+El asegurado debe notificar mejoras o ampliaciones que incrementen el valor del inmueble.
