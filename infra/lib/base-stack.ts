@@ -139,10 +139,24 @@ export class AssistanceStack extends cdk.Stack {
       autoDeleteObjects: !isProd,
       lifecycleRules: [
         {
-          id:         "expire-documents",
-          expiration: cdk.Duration.days(7),
-          enabled:    true,
+          // Non-PHI documents (auto, home, theft, other): expire after 7 days.
+          // aggregate-risk tags these with phi=false after processing.
+          id:          "expire-non-phi-documents",
+          tagFilters:  { phi: "false" },
+          expiration:  cdk.Duration.days(7),
+          enabled:     true,
         },
+        {
+          // PHI documents (health claims): HIPAA minimum retention 6 years.
+          // aggregate-risk tags these with phi=true after processing.
+          id:          "retain-phi-documents",
+          tagFilters:  { phi: "true" },
+          expiration:  cdk.Duration.days(2190),
+          enabled:     true,
+        },
+        // Untagged objects (uploaded but not yet processed) are not matched by
+        // either rule above, so they are retained until aggregate-risk tags them.
+        // aggregate-risk always runs — including on the error path.
       ],
       cors: [
         {
@@ -552,6 +566,15 @@ export class AssistanceStack extends cdk.Stack {
       actions: ["dynamodb:GetItem", "dynamodb:UpdateItem"],
       resources: [this.claimsTable.tableArn],
     }));
+
+    // S3 tagging: aggregate-risk sets phi=true/false on each document after determining
+    // claimType, so the correct lifecycle rule (7 days vs 6 years) kicks in.
+    sfAggregateRole.addToPolicy(new iam.PolicyStatement({
+      sid:       "AllowDocumentTagging",
+      actions:   ["s3:PutObjectTagging"],
+      resources: [`${documentsBucket.bucketArn}/documents/*`],
+    }));
+
     // SageMaker Serverless: invoke fraud scoring endpoint (optional — only used when
     // FRAUD_SCORING_ENDPOINT_NAME is set after training; graceful fallback to rules)
     sfAggregateRole.addToPolicy(new iam.PolicyStatement({

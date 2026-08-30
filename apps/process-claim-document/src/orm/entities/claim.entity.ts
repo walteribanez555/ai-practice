@@ -58,13 +58,17 @@ export interface Claim extends Record<string, unknown> {
   // Routing
   requiresHumanReview: boolean;
   priority?: Priority;
+  // HIPAA — set by aggregate-risk after claimType is known.
+  // true  → health claim (PHI): DynamoDB TTL = 6 years, S3 tag phi=true (2190-day lifecycle)
+  // false → non-PHI claim:      DynamoDB TTL = 90 days,  S3 tag phi=false (7-day lifecycle)
+  containsPHI?: boolean;
   // Error details (populated when status = error)
   errorReason?: string;
   // Timestamps (ISO strings — doubles as GSI sort keys)
   createdAt: string;
   updatedAt: string;
   processedAt?: string;
-  // Optional DynamoDB TTL (epoch seconds)
+  // DynamoDB TTL (epoch seconds) — set by aggregate-risk based on containsPHI
   ttl?: number;
 }
 
@@ -88,6 +92,8 @@ export type UpdateClaimInput = Partial<
     | 'coverageApplies'
     | 'requiresHumanReview'
     | 'priority'
+    | 'containsPHI'
+    | 'ttl'
     | 'errorReason'
     | 'processedAt'
     | 'updatedAt'

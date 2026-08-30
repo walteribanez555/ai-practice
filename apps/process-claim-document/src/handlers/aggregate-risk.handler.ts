@@ -14,6 +14,7 @@
 
 import type { Handler } from 'aws-lambda';
 import { SageMakerRuntimeClient, InvokeEndpointCommand } from '@aws-sdk/client-sagemaker-runtime';
+import { S3Client, PutObjectTaggingCommand } from '@aws-sdk/client-s3';
 import { ClaimEntity } from '../orm/entities/claim.entity';
 import type { DocumentAnalysis } from '../orm/entities/claim.entity';
 import { createLogger } from '../config/logger';
@@ -24,10 +25,16 @@ const logger = createLogger('AggregateRisk');
 const FRAUD_THRESHOLD       = 60;
 const HIGH_AMOUNT_THRESHOLD = 50_000;
 const ENDPOINT_NAME         = process.env.FRAUD_SCORING_ENDPOINT_NAME ?? '';
+const DOCUMENTS_BUCKET      = process.env.DOCUMENTS_BUCKET_NAME ?? '';
+
+const PHI_TTL_DAYS     = 6 * 365;  // HIPAA minimum 6-year retention
+const NON_PHI_TTL_DAYS = 90;
 
 const sagemakerClient = ENDPOINT_NAME
   ? new SageMakerRuntimeClient({})
   : null;
+
+const s3Client = new S3Client({});
 
 function mergeExtractions(extractions: ExtractionResult[]) {
   const claimType          = extractions.find(e => e.claimType)?.claimType ?? null;
@@ -156,16 +163,53 @@ function computeRuleBasedScore(
   return { score: Math.min(Math.round(score + avgIntegrityScore * 0.15), 100), signals };
 }
 
+// Tags all S3 documents belonging to a claim with phi=true or phi=false.
+// This drives the lifecycle rule: 7 days for non-PHI, 2190 days for PHI.
+// Errors are logged but do not fail the handler — tagging is best-effort;
+// untagged objects simply have no expiry until the next run or manual action.
+async function tagDocuments(documentKeys: string[], containsPHI: boolean): Promise<void> {
+  if (!DOCUMENTS_BUCKET || !documentKeys.length) return;
+  const tagValue = containsPHI ? 'true' : 'false';
+  await Promise.allSettled(
+    documentKeys.map(key =>
+      s3Client.send(new PutObjectTaggingCommand({
+        Bucket:  DOCUMENTS_BUCKET,
+        Key:     key,
+        Tagging: { TagSet: [{ Key: 'phi', Value: tagValue }] },
+      })).catch(err => logger.warn('Failed to tag document', { key, error: String(err) }))
+    )
+  );
+  logger.info('Tagged documents', { count: documentKeys.length, phi: tagValue });
+}
+
+function toEpochSeconds(daysFromNow: number): number {
+  return Math.floor((Date.now() + daysFromNow * 86_400_000) / 1000);
+}
+
 export const handler: Handler<AggregateRiskEvent> = async (event) => {
   const { claimId, phase1Results, phase2Results } = event;
 
-  // Error path
+  // Error path — tag documents as non-PHI (unknown claimType) and set short TTL.
+  // Documents from failed claims are not classified; 90-day DynamoDB TTL allows investigation.
   if (!phase1Results) {
     const { error, cause } = event as unknown as { error: string; cause: string };
     let errorReason = error;
     try { errorReason = (JSON.parse(cause) as { errorMessage?: string }).errorMessage ?? error; } catch { /* raw */ }
     logger.warn('Claim analysis failed', { claimId, error });
-    await ClaimEntity.update(claimId, { status: 'error', errorReason, processedAt: new Date().toISOString() });
+
+    const claim = await ClaimEntity.findById(claimId);
+    if (claim) {
+      const documentKeys = (claim.documents ?? []).map(d => d.key);
+      await tagDocuments(documentKeys, false);
+    }
+
+    await ClaimEntity.update(claimId, {
+      status:      'error',
+      errorReason,
+      containsPHI: false,
+      ttl:         toEpochSeconds(NON_PHI_TTL_DAYS),
+      processedAt: new Date().toISOString(),
+    });
     return;
   }
 
@@ -201,6 +245,15 @@ export const handler: Handler<AggregateRiskEvent> = async (event) => {
 
   logger.info('Risk aggregated', { claimId, fraudScore, consistent: consistency?.consistent });
 
+  // HIPAA — health claims contain PHI: apply 6-year retention on S3 and DynamoDB.
+  const containsPHI = claimType === 'health';
+  const ttl         = toEpochSeconds(containsPHI ? PHI_TTL_DAYS : NON_PHI_TTL_DAYS);
+
+  // Tag S3 documents before updating DynamoDB so lifecycle rules apply immediately.
+  const claim        = await ClaimEntity.findById(claimId);
+  const documentKeys = (claim?.documents ?? []).map(d => d.key);
+  await tagDocuments(documentKeys, containsPHI);
+
   const documentAnalyses: DocumentAnalysis[] = perDocResults.map(([ext, int]) => ({
     documentKey:         ext.documentKey,
     contentType:         ext.contentType,
@@ -232,6 +285,8 @@ export const handler: Handler<AggregateRiskEvent> = async (event) => {
     crossDocObservations: consistency?.crossDocObservations,
     requiresHumanReview,
     priority,
+    containsPHI,
+    ttl,
     processedAt:         new Date().toISOString(),
     documentAnalyses,
   });
