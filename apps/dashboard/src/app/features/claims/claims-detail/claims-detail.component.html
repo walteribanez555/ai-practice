@@ -219,11 +219,56 @@
         </div>
       }
 
-      <!-- Error reason -->
+        <!-- Error reason -->
       @if (claim()!.errorReason) {
         <div class="rounded-xl border border-red-200 bg-red-50 p-5 dark:border-red-800 dark:bg-red-900/20 sm:col-span-2">
           <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-red-400">Error de procesamiento</p>
           <p class="text-sm text-red-700 dark:text-red-300">{{ claim()!.errorReason }}</p>
+        </div>
+      }
+
+      <!-- GDPR Art. 17 — erasure banner -->
+      @if (claim()!.gdprErasedAt) {
+        <div class="rounded-xl border border-gray-300 bg-gray-100 p-5 dark:border-gray-600 dark:bg-gray-800 sm:col-span-2">
+          <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Datos anonimizados (GDPR Art. 17)</p>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Los datos personales de esta reclamación fueron eliminados el {{ claim()!.gdprErasedAt | date:'dd/MM/yyyy HH:mm' }} en respuesta a una solicitud de supresión.
+          </p>
+        </div>
+      }
+
+      <!-- GDPR Art. 22 — automated processing notice (client view, when processed) -->
+      @if (!store.isAdjuster() && claim()!.automatedProcessing) {
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-800 dark:bg-blue-900/10 sm:col-span-2">
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">Procesamiento automatizado (GDPR Art. 22)</p>
+          <p class="text-sm text-gray-700 dark:text-gray-300">{{ claim()!.automatedProcessing!.description }}</p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ claim()!.automatedProcessing!.rightToContest }}</p>
+        </div>
+      }
+
+      <!-- GDPR Art. 13 — consent confirmation + Art. 20 export (client only) -->
+      @if (!store.isAdjuster()) {
+        <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900 sm:col-span-2">
+          <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Tus derechos GDPR</p>
+          <div class="flex flex-wrap items-center gap-4">
+            @if (claim()!.gdprConsentAt) {
+              <span class="inline-flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Consentimiento registrado el {{ claim()!.gdprConsentAt | date:'dd/MM/yyyy' }}
+              </span>
+            }
+            <button
+              (click)="exportData()"
+              [disabled]="exporting()"
+              class="ml-auto flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors">
+              @if (exporting()) {
+                <span class="h-3 w-3 animate-spin rounded-full border-2 border-gray-400 border-t-transparent"></span>
+              } @else {
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              }
+              Exportar mis datos (Art. 20)
+            </button>
+          </div>
         </div>
       }
     </div>

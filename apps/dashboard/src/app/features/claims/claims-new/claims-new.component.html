@@ -56,10 +56,27 @@
           <p class="mt-3 text-sm text-red-600 dark:text-red-400">{{ errorMsg() }}</p>
         }
 
+        <!-- GDPR Art. 13 — data processing consent -->
+        <div class="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/10">
+          <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">Tratamiento de datos personales</p>
+          <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+            Los documentos y datos que envíes serán analizados por un sistema automatizado de inteligencia artificial para evaluar indicadores de fraude y determinar la cobertura de tu póliza.
+            Tu información será conservada según los plazos legales aplicables. Tienes derecho de acceso, rectificación, supresión y portabilidad de tus datos.
+            Para ejercer tus derechos, contacta a tu ajustador.
+          </p>
+          <label class="mt-3 flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" [checked]="gdprConsent()" (change)="gdprConsent.set(!gdprConsent())"
+                   class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
+            <span class="text-xs text-gray-700 dark:text-gray-300">
+              He leído y acepto el tratamiento de mis datos personales para el procesamiento de esta reclamación.
+            </span>
+          </label>
+        </div>
+
         <button
           (click)="submit()"
-          [disabled]="!docs().length"
-          class="mt-6 w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed">
+          [disabled]="!docs().length || !gdprConsent()"
+          class="mt-4 w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed">
           Enviar Reclamación ({{ docs().length }} documento{{ docs().length !== 1 ? 's' : '' }})
         </button>
       </div>

@@ -158,6 +158,27 @@ export class ClaimsDetailComponent implements OnInit {
 
   get isDraft() { return this.claim()?.status === 'draft'; }
 
+  // GDPR Art. 20 — download all personal data as JSON
+  exporting = signal(false);
+  exportData() {
+    const clientId = this.claim()?.clientId ?? this.store.userId();
+    if (!clientId) return;
+    this.exporting.set(true);
+    this.claimsService.gdprExport(clientId).subscribe({
+      next: (data) => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `mis-datos-gdpr-${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+      },
+      error: () => this.exporting.set(false),
+    });
+  }
+
   // Drawer
   drawerOpen    = signal(false);
   selectedDoc   = signal<DocumentAnalysis | null>(null);

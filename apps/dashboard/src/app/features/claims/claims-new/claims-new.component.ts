@@ -34,10 +34,11 @@ export class ClaimsNewComponent {
   private claimsService = inject(ClaimsService);
   private router        = inject(Router);
 
-  step     = signal<Step>('add-docs');
-  docs     = signal<DocSlot[]>([]);
-  claim    = signal<Claim | null>(null);
-  errorMsg = signal<string | null>(null);
+  step        = signal<Step>('add-docs');
+  docs        = signal<DocSlot[]>([]);
+  claim       = signal<Claim | null>(null);
+  errorMsg    = signal<string | null>(null);
+  gdprConsent = signal(false);
 
   onFilesChange(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -64,10 +65,16 @@ export class ClaimsNewComponent {
     this.errorMsg.set(null);
     this.step.set('submitting');
 
+    if (!this.gdprConsent()) {
+      this.errorMsg.set('Debes aceptar el aviso de tratamiento de datos para continuar.');
+      this.step.set('add-docs');
+      return;
+    }
+
     // 1. Create claim draft
     let claim: Claim;
     try {
-      claim = await this.claimsService.create().toPromise() as Claim;
+      claim = await this.claimsService.create(this.gdprConsent()).toPromise() as Claim;
       this.claim.set(claim);
     } catch (e: any) {
       this.step.set('error');

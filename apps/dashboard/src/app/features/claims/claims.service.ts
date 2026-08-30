@@ -19,8 +19,14 @@ export class ClaimsService {
   get(id: string)                { return this.http.get<Claim>(`${this.base}/${id}`); }
   listByClient(clientId: string) { return this.http.get<Claim[]>(`${this.base}/client/${clientId}`); }
 
-  create() {
-    return this.http.post<Claim>(this.base, {});
+  create(gdprConsent = false) {
+    return this.http.post<Claim>(this.base, { gdprConsent });
+  }
+
+  gdprExport(clientId: string) {
+    return this.http.get<{ exportedAt: string; clientId: string; totalClaims: number; gdprNotice: string; claims: Claim[] }>(
+      `${this.base}/gdpr/export/${clientId}`
+    );
   }
 
   addDocument(id: string, contentType: string, fileSizeBytes: number) {

@@ -38,6 +38,7 @@ export const AuthStore = signalStore(
     isAdjuster:  computed(() => user()?.role === 'adjuster'),
     isClient:    computed(() => user()?.role === 'client'),
     displayName: computed(() => user()?.email ?? ''),
+    userId:      computed(() => user()?.userId ?? null),
   })),
 
   withMethods((store, authService = inject(AuthService), router = inject(Router)) => ({
