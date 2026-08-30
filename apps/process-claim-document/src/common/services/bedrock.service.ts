@@ -57,13 +57,18 @@ interface ClaimExtractionInput {
 
 const IMAGE_FORMAT_MAP: Record<string, ImageFormat> = {
   'image/jpeg': 'jpeg',
+  'jpeg':       'jpeg',
   'image/png':  'png',
+  'png':        'png',
   'image/gif':  'gif',
+  'gif':        'gif',
   'image/webp': 'webp',
+  'webp':       'webp',
 };
 
 const DOCUMENT_FORMAT_MAP: Record<string, DocumentFormat> = {
   'application/pdf': 'pdf',
+  'pdf':             'pdf',
 };
 
 function buildContentBlock(buffer: Buffer, mimeType: string): ContentBlock {
