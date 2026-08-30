@@ -64,12 +64,6 @@ export const ClaimController = {
     const role   = c.get('userRole');
     const userId = c.get('userId');
 
-    if (!body.documentKey) return c.json({ error: 'documentKey is required.', code: 'MISSING_DOCUMENT_KEY' }, 400);
-    if (!body.contentType)  return c.json({ error: 'contentType is required.',  code: 'MISSING_CONTENT_TYPE'  }, 400);
-    if (!body.fileSizeBytes || body.fileSizeBytes <= 0) {
-      return c.json({ error: 'fileSizeBytes must be greater than 0.', code: 'MISSING_FILE_SIZE' }, 400);
-    }
-
     const clientId = role === 'client' ? userId : (body.clientId ?? userId);
     logger.info('Claim create (draft)', { clientId });
     const claim = await ClaimService.create({ clientId, policyId: body.policyId });
