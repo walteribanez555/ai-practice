@@ -1,0 +1,126 @@
+import { Component, inject, signal, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { ClaimsService } from '../claims.service';
+import { AuthStore } from '../../auth/store/auth.store';
+import type { Claim, UpdateClaimPayload } from '../claims.models';
+
+@Component({
+  selector: 'app-claims-detail',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './claims-detail.component.html',
+})
+export class ClaimsDetailComponent implements OnInit {
+  private claimsService = inject(ClaimsService);
+  private route         = inject(ActivatedRoute);
+  private router        = inject(Router);
+  readonly store        = inject(AuthStore);
+
+  claim        = signal<Claim | null>(null);
+  loading      = signal(true);
+  error        = signal<string | null>(null);
+
+  processing   = signal(false);
+  processMsg   = signal<string | null>(null);
+
+  updating     = signal(false);
+  updateMsg    = signal<string | null>(null);
+  showUpdateForm = signal(false);
+
+  deleting     = signal(false);
+
+  // Update form model
+  updateForm: UpdateClaimPayload = {};
+
+  ngOnInit() {
+    const id = this.route.snapshot.paramMap.get('id')!;
+    this.claimsService.get(id).subscribe({
+      next:  (c) => { this.claim.set(c); this.prefillForm(c); this.loading.set(false); },
+      error: ()  => { this.error.set('No se pudo cargar la reclamación.'); this.loading.set(false); },
+    });
+  }
+
+  private prefillForm(c: Claim) {
+    this.updateForm = {
+      claimType:          c.claimType ?? undefined,
+      estimatedAmount:    c.estimatedAmount ?? undefined,
+      incidentDate:       c.incidentDate ?? undefined,
+      descriptionSummary: c.descriptionSummary ?? undefined,
+      involvedParties:    c.involvedParties ?? undefined,
+    };
+  }
+
+  process() {
+    const id = this.claim()!.id;
+    this.processing.set(true);
+    this.processMsg.set(null);
+    this.claimsService.process(id).subscribe({
+      next: (res) => {
+        this.processMsg.set(`✓ ${res.message}`);
+        this.processing.set(false);
+        // Refresh claim
+        this.claimsService.get(id).subscribe(c => this.claim.set(c));
+      },
+      error: (e) => {
+        this.processMsg.set(e?.error?.error ?? 'Error al procesar.');
+        this.processing.set(false);
+      },
+    });
+  }
+
+  submitUpdate() {
+    const id = this.claim()!.id;
+    this.updating.set(true);
+    this.updateMsg.set(null);
+    this.claimsService.update(id, this.updateForm).subscribe({
+      next: (c) => {
+        this.claim.set(c);
+        this.updateMsg.set('✓ Actualizado correctamente.');
+        this.updating.set(false);
+        this.showUpdateForm.set(false);
+      },
+      error: (e) => {
+        this.updateMsg.set(e?.error?.error ?? 'Error al actualizar.');
+        this.updating.set(false);
+      },
+    });
+  }
+
+  deleteClaim() {
+    if (!confirm('¿Eliminar esta reclamación? Esta acción no se puede deshacer.')) return;
+    this.deleting.set(true);
+    this.claimsService.delete(this.claim()!.id).subscribe({
+      next:  () => this.router.navigate(['/dashboard/claims']),
+      error: () => { this.error.set('Error al eliminar.'); this.deleting.set(false); },
+    });
+  }
+
+  statusLabel(s: string) {
+    const map: Record<string, string> = { pending: 'Pendiente', processing: 'Procesando', processed: 'Procesado', error: 'Error' };
+    return map[s] ?? s;
+  }
+
+  statusClass(s: string) {
+    const map: Record<string, string> = {
+      pending:    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+      processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+      processed:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      error:      'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    };
+    return map[s] ?? 'bg-gray-100 text-gray-800';
+  }
+
+  get canProcess() {
+    const s = this.claim()?.status;
+    return this.store.isAdjuster() && (s === 'pending' || s === 'error');
+  }
+
+  get involvedPartiesStr() {
+    return (this.updateForm.involvedParties ?? []).join(', ');
+  }
+  set involvedPartiesStr(val: string) {
+    this.updateForm.involvedParties = val ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
+  }
+}

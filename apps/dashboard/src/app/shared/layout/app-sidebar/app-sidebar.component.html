@@ -239,14 +239,37 @@
               }
             </li>
             }
+            @if (authStore.isClient()) {
+              <li>
+                <a
+                  routerLink="/dashboard/claims/new"
+                  routerLinkActive="menu-item-active"
+                  class="menu-item group"
+                  [ngClass]="{ 'menu-item-inactive': !isActive('/dashboard/claims/new') }"
+                >
+                  <span
+                    class="menu-item-icon-size"
+                    [ngClass]="{
+                      'menu-item-icon-active': isActive('/dashboard/claims/new'),
+                      'menu-item-icon-inactive': !isActive('/dashboard/claims/new')
+                    }">
+                    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H5a1 1 0 110-2h6V5a1 1 0 011-1z" fill="currentColor"/>
+                    </svg>
+                  </span>
+                  <span class="menu-item-text">
+                    @if ((isExpanded$ | async) || (isHovered$ | async) || (isMobileOpen$ | async)) {
+                      Nueva Reclamación
+                    }
+                  </span>
+                </a>
+              </li>
+            }
           </ul>
         </div>
         <!-- end main menu -->
 
-        <!-- Support Section -->
-        <!-- end support section -->
-
-        <!-- Others Section -->
+        <!-- Others Section (empty — reserved for future items) -->
         <div>
           <h2
             class="mb-4 text-xs uppercase flex leading-[20px] text-gray-400"

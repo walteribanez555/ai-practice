@@ -16,14 +16,13 @@ export const routes: Routes = [
     component: AppLayoutComponent,
     canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: '', redirectTo: 'dashboard/claims', pathMatch: 'full' },
+      { path: 'dashboard', redirectTo: 'dashboard/claims', pathMatch: 'full' },
       {
-        path: 'dashboard',
+        path: 'dashboard/claims',
         loadChildren: () =>
-          import('./features/dashboard/dashboard.routes').then(m => m.DASHBOARD_ROUTES),
+          import('./features/claims/claims.routes').then(m => m.CLAIMS_ROUTES),
       },
-      // Future features mount here:
-      // { path: 'claims', loadChildren: () => import('./features/claims/claims.routes').then(m => m.CLAIMS_ROUTES) },
     ],
   },
 
