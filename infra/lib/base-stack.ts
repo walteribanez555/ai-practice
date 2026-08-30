@@ -285,6 +285,7 @@ export class AssistanceStack extends cdk.Stack {
       encryptionAtRest:    { enabled: true },
       nodeToNodeEncryption: true,
       enforceHttps:        true,
+      tlsSecurityPolicy:   opensearch.TLSSecurityPolicy.TLS_1_2,
       removalPolicy:       cdk.RemovalPolicy.DESTROY,
       logging: {
         slowSearchLogEnabled: false,
