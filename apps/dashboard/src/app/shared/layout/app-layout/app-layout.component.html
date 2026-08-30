@@ -1,21 +1,26 @@
-<div class="min-h-screen xl:flex">
+<div class="min-h-screen bg-gray-50 dark:bg-gray-950 xl:flex">
+
+  <!-- Sidebar (fixed, z-40) -->
   <div>
     <app-sidebar></app-sidebar>
     <app-backdrop></app-backdrop>
   </div>
+
+  <!-- Main column -->
   <div
-      class="flex-1 transition-all duration-300 ease-in-out"
-      [ngClass]="{
-        'xl:ml-[290px]': (isExpanded$ | async) || (isHovered$ | async),
-        'xl:ml-[90px]': !(isExpanded$ | async) && !(isHovered$ | async),
-        'ml-0': (isMobileOpen$ | async)
-      }"
-  >
-    <!-- app header start -->
+    class="flex min-h-screen flex-col transition-all duration-300 ease-in-out"
+    [ngClass]="{
+      'xl:ml-[290px]': (isExpanded$ | async) || (isHovered$ | async),
+      'xl:ml-[90px]':  !((isExpanded$ | async) || (isHovered$ | async))
+    }">
+
+    <!-- Header (sticky, z-50 — sits above sidebar on mobile) -->
     <app-header/>
-    <!-- app header end -->
-    <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+
+    <!-- Page content -->
+    <main class="flex-1 p-4 md:p-6">
       <router-outlet></router-outlet>
-    </div>
+    </main>
+
   </div>
 </div>

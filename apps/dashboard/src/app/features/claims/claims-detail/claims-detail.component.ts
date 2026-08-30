@@ -67,7 +67,7 @@ export class ClaimsDetailComponent implements OnInit {
     this.processMsg.set(null);
     this.claimsService.process(id).subscribe({
       next: (res) => {
-        this.processMsg.set(`✓ ${res.message}`);
+        this.processMsg.set(`${res.message}`);
         this.processing.set(false);
         // Refresh claim
         this.claimsService.get(id).subscribe(c => this.claim.set(c));
@@ -86,7 +86,7 @@ export class ClaimsDetailComponent implements OnInit {
     this.claimsService.update(id, this.updateForm).subscribe({
       next: (c) => {
         this.claim.set(c);
-        this.updateMsg.set('✓ Actualizado correctamente.');
+        this.updateMsg.set('Actualizado correctamente.');
         this.updating.set(false);
         this.showUpdateForm.set(false);
       },
@@ -160,7 +160,7 @@ export class ClaimsDetailComponent implements OnInit {
           next: (ev) => {
             if ((ev as any).type === 4) { // Response
               this.claimsService.get(id).subscribe(c => this.claim.set(c));
-              this.addDocMsg.set('✓ Documento agregado.');
+              this.addDocMsg.set('Documento agregado.');
               this.addingDoc.set(false);
             }
           },

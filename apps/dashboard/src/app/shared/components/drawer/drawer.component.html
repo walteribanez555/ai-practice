@@ -1,7 +1,7 @@
 @if (visible) {
   <!-- Backdrop -->
   <div
-    class="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300"
+    class="fixed inset-0 z-[60] bg-black/40 transition-opacity duration-300"
     [class.opacity-0]="!animate"
     [class.opacity-100]="animate"
     (click)="close()">
@@ -9,7 +9,7 @@
 
   <!-- Panel -->
   <div
-    class="fixed inset-y-0 right-0 z-50 flex flex-col bg-white dark:bg-gray-900 shadow-2xl transition-transform duration-300 ease-in-out"
+    class="fixed inset-y-0 right-0 z-[61] flex flex-col bg-white dark:bg-gray-900 shadow-2xl transition-transform duration-300 ease-in-out"
     [style.width]="width"
     [class.translate-x-full]="!animate"
     [class.translate-x-0]="animate">
