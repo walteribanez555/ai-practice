@@ -137,6 +137,67 @@
       }
     </div>
 
+    <!-- Draft panel: add documents + submit -->
+    @if (isDraft) {
+      <div class="mb-4 space-y-4">
+
+        <!-- Documents already added -->
+        @if (claim()!.documents?.length) {
+          <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+            <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Documentos agregados ({{ claim()!.documents!.length }})
+            </p>
+            <ul class="space-y-2">
+              @for (doc of claim()!.documents!; track doc.key) {
+                <li class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span class="font-mono text-xs">{{ doc.key.split('/')[1]?.slice(0,8) }}…</span>
+                  <span class="ml-1 text-xs text-gray-400 uppercase">{{ doc.contentType }}</span>
+                  <span class="ml-auto text-xs text-gray-400">{{ ((doc.fileSizeBytes ?? 0) / 1024).toFixed(1) }} KB</span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <!-- Add document -->
+        <div class="rounded-xl border border-dashed border-gray-300 bg-white p-5 dark:border-gray-600 dark:bg-gray-900">
+          <p class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Agregar documento</p>
+          <label class="flex cursor-pointer items-center gap-3 text-sm text-brand-500 hover:text-brand-600">
+            @if (addingDoc()) {
+              <span class="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"></span>
+              Subiendo…
+            } @else {
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              Seleccionar archivo (PDF, JPEG, PNG)
+            }
+            <input type="file" class="hidden" accept=".pdf,.jpg,.jpeg,.png" [disabled]="addingDoc()" (change)="onAddDocFile($event)"/>
+          </label>
+          @if (addDocMsg()) {
+            <p class="mt-2 text-xs" [class]="addDocMsg()!.startsWith('✓') ? 'text-green-600' : 'text-red-600'">{{ addDocMsg() }}</p>
+          }
+        </div>
+
+        <!-- Submit -->
+        <button
+          (click)="submitDraft()"
+          [disabled]="!claim()!.documents?.length || submitting()"
+          class="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          @if (submitting()) {
+            <span class="inline-flex items-center gap-2">
+              <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              Enviando…
+            </span>
+          } @else {
+            Enviar para análisis ({{ claim()!.documents?.length ?? 0 }} doc{{ (claim()!.documents?.length ?? 0) !== 1 ? 's' : '' }})
+          }
+        </button>
+        @if (submitMsg()) {
+          <p class="text-sm text-red-600 dark:text-red-400">{{ submitMsg() }}</p>
+        }
+      </div>
+    }
+
     <!-- Adjuster actions -->
     @if (store.isAdjuster()) {
       <div class="space-y-4">

@@ -19,8 +19,18 @@ export class ClaimsService {
   get(id: string)                { return this.http.get<Claim>(`${this.base}/${id}`); }
   listByClient(clientId: string) { return this.http.get<Claim[]>(`${this.base}/client/${clientId}`); }
 
-  create(body: Omit<CreateClaimPayload, 'documentKey'>) {
-    return this.http.post<CreateClaimResponse>(this.base, body);
+  create() {
+    return this.http.post<Claim>(this.base, {});
+  }
+
+  addDocument(id: string, contentType: string, fileSizeBytes: number) {
+    return this.http.post<{ documentKey: string; uploadUrl: string; expiresIn: number; mimeType: string }>(
+      `${this.base}/${id}/documents`, { contentType, fileSizeBytes }
+    );
+  }
+
+  submit(id: string) {
+    return this.http.post<{ id: string; status: string; message: string }>(`${this.base}/${id}/submit`, {});
   }
 
   process(id: string) {

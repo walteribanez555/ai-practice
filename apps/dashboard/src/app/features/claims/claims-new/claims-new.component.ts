@@ -1,80 +1,133 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { HttpEventType } from '@angular/common/http';
 import { ClaimsService } from '../claims.service';
+import type { Claim } from '../claims.models';
 
-type Step = 'upload' | 'submitting' | 'done' | 'error';
 type ContentType = 'pdf' | 'jpeg' | 'png';
+type UploadStatus = 'pending' | 'uploading' | 'done' | 'error';
+
+interface DocSlot {
+  file:        File;
+  contentType: ContentType;
+  status:      UploadStatus;
+  progress:    number;
+  error:       string | null;
+}
+
+type Step = 'add-docs' | 'submitting' | 'done' | 'error';
+
+const MIME: Record<ContentType, string> = {
+  pdf:  'application/pdf',
+  jpeg: 'image/jpeg',
+  png:  'image/png',
+};
 
 @Component({
   selector: 'app-claims-new',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, RouterModule],
   templateUrl: './claims-new.component.html',
 })
 export class ClaimsNewComponent {
   private claimsService = inject(ClaimsService);
   private router        = inject(Router);
 
-  step         = signal<Step>('upload');
-  uploadPct    = signal(0);
-  errorMsg     = signal<string | null>(null);
-  selectedFile = signal<File | null>(null);
-  contentType  = signal<ContentType>('pdf');
+  step     = signal<Step>('add-docs');
+  docs     = signal<DocSlot[]>([]);
+  claim    = signal<Claim | null>(null);
+  errorMsg = signal<string | null>(null);
 
-  readonly mimeMap: Record<ContentType, string> = {
-    pdf:  'application/pdf',
-    jpeg: 'image/jpeg',
-    png:  'image/png',
-  };
-
-  onFileChange(event: Event) {
+  onFilesChange(event: Event) {
     const input = event.target as HTMLInputElement;
-    const file  = input.files?.[0];
-    if (!file) return;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
 
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-    if (!['pdf', 'jpeg', 'jpg', 'png'].includes(ext)) {
-      this.errorMsg.set('Solo se aceptan archivos PDF, JPEG o PNG.');
+    const slots: DocSlot[] = files.map(file => {
+      const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+      const ct: ContentType = ext === 'jpg' ? 'jpeg' : (ext as ContentType);
+      return { file, contentType: ct, status: 'pending' as UploadStatus, progress: 0, error: null };
+    }).filter(s => ['pdf', 'jpeg', 'png'].includes(s.contentType));
+
+    this.docs.update(d => [...d, ...slots]);
+  }
+
+  removeDoc(idx: number) {
+    this.docs.update(d => d.filter((_, i) => i !== idx));
+  }
+
+  async submit() {
+    const slots = this.docs();
+    if (!slots.length) { this.errorMsg.set('Agrega al menos un documento.'); return; }
+
+    this.errorMsg.set(null);
+    this.step.set('submitting');
+
+    // 1. Create claim draft
+    let claim: Claim;
+    try {
+      claim = await this.claimsService.create().toPromise() as Claim;
+      this.claim.set(claim);
+    } catch (e: any) {
+      this.step.set('error');
+      this.errorMsg.set(e?.error?.error ?? 'Error al crear la reclamación.');
       return;
     }
 
-    const ct: ContentType = ext === 'jpg' ? 'jpeg' : ext as ContentType;
-    this.contentType.set(ct);
-    this.selectedFile.set(file);
-    this.errorMsg.set(null);
+    // 2. Add each document + upload in parallel
+    const uploads = slots.map((slot, idx) =>
+      this.claimsService.addDocument(claim.id, slot.contentType, slot.file.size).toPromise()
+        .then(({ uploadUrl, mimeType }: any) =>
+          new Promise<void>((resolve, reject) => {
+            this.claimsService.uploadToS3(uploadUrl, slot.file, mimeType).subscribe({
+              next: (ev) => {
+                if (ev.type === HttpEventType.UploadProgress && ev.total) {
+                  const pct = Math.round(100 * ev.loaded / ev.total);
+                  this.docs.update(d => d.map((s, i) => i === idx ? { ...s, status: 'uploading', progress: pct } : s));
+                }
+                if (ev.type === HttpEventType.Response) {
+                  this.docs.update(d => d.map((s, i) => i === idx ? { ...s, status: 'done', progress: 100 } : s));
+                  resolve();
+                }
+              },
+              error: () => {
+                this.docs.update(d => d.map((s, i) => i === idx ? { ...s, status: 'error', error: 'Error al subir' } : s));
+                reject(new Error('Upload failed'));
+              },
+            });
+          })
+        )
+    );
+
+    try {
+      await Promise.all(uploads);
+    } catch {
+      this.step.set('error');
+      this.errorMsg.set('Uno o más documentos no se pudieron subir. Revisa los errores e intenta de nuevo.');
+      return;
+    }
+
+    // 3. Submit claim → starts Step Function
+    try {
+      await this.claimsService.submit(claim.id).toPromise();
+      this.step.set('done');
+      setTimeout(() => this.router.navigate(['/dashboard/claims']), 1500);
+    } catch (e: any) {
+      this.step.set('error');
+      this.errorMsg.set(e?.error?.error ?? 'Error al enviar la reclamación.');
+    }
   }
 
-  submit() {
-    const file = this.selectedFile();
-    if (!file) { this.errorMsg.set('Selecciona un archivo.'); return; }
-
-    this.step.set('submitting');
-    this.errorMsg.set(null);
-    const ct = this.contentType();
-
-    // 1. Create claim record — API returns presigned URL
-    this.claimsService.create({ contentType: ct, fileSizeBytes: file.size }).subscribe({
-      next: ({ uploadUrl }) => {
-        // 2. Upload document to S3 — S3 trigger starts processing automatically
-        this.claimsService.uploadToS3(uploadUrl, file, this.mimeMap[ct]).subscribe({
-          next: (ev) => {
-            if (ev.type === HttpEventType.UploadProgress && ev.total) {
-              this.uploadPct.set(Math.round(100 * ev.loaded / ev.total));
-            }
-            if (ev.type === HttpEventType.Response) {
-              this.step.set('done');
-              setTimeout(() => this.router.navigate(['/dashboard/claims']), 1500);
-            }
-          },
-          error: () => { this.step.set('error'); this.errorMsg.set('Error al subir el archivo a S3.'); },
-        });
-      },
-      error: (e) => { this.step.set('error'); this.errorMsg.set(e?.error?.error ?? 'Error al crear la reclamación.'); },
-    });
+  retry() {
+    this.step.set('add-docs');
+    this.docs.update(d => d.map(s => ({ ...s, status: 'pending', progress: 0, error: null })));
+    this.claim.set(null);
   }
 
-  retry() { this.step.set('upload'); this.uploadPct.set(0); }
+  totalProgress() {
+    const d = this.docs();
+    if (!d.length) return 0;
+    return Math.round(d.reduce((sum, s) => sum + s.progress, 0) / d.length);
+  }
 }

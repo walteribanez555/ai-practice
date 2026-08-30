@@ -1,6 +1,6 @@
 import { ClaimModel } from './claim.model';
 import { BadRequestException, NotFoundException, UnprocessableException } from '../../common/exceptions';
-import type { Claim, CreateClaimInput } from '../../orm/entities/claim.entity';
+import type { Claim, CreateClaimInput, DocumentRef } from '../../orm/entities/claim.entity';
 import type { CreateClaimDto, ProcessClaimDto, UpdateClaimDto } from './claim.dto';
 import {
   ALLOWED_CONTENT_TYPES,
@@ -40,36 +40,18 @@ export const ClaimService = {
   // ── Create ────────────────────────────────────────────────────────────────
 
   async create(dto: CreateClaimDto): Promise<Claim> {
-    if (!ALLOWED_CONTENT_TYPES.includes(dto.contentType as never)) {
-      throw new BadRequestException(
-        `contentType "${dto.contentType}" is not allowed. Accepted: ${ALLOWED_CONTENT_TYPES.join(', ')}.`,
-        'INVALID_CONTENT_TYPE',
-      );
-    }
-
-    if (dto.fileSizeBytes > MAX_FILE_SIZE_BYTES) {
-      const mb = (dto.fileSizeBytes / 1024 / 1024).toFixed(1);
-      throw new BadRequestException(
-        `File size ${mb} MB exceeds the 15 MB limit.`,
-        'FILE_TOO_LARGE',
-      );
-    }
-
-    const input: CreateClaimInput = {
-      clientId:      dto.clientId,
-      documentKey:   dto.documentKey,
-      contentType:   dto.contentType,
-      fileSizeBytes: dto.fileSizeBytes,
+    return ClaimModel.create({
+      clientId: dto.clientId,
       ...(dto.policyId ? { policyId: dto.policyId } : {}),
-    };
-
-    return ClaimModel.create(input);
+    });
   },
-
-  // ── Mark processing (used by controller before starting Step Functions) ──
 
   markProcessing(id: string): Promise<Claim | null> {
     return ClaimModel.update(id, { status: 'processing' });
+  },
+
+  appendDocument(id: string, doc: DocumentRef): Promise<Claim | null> {
+    return ClaimModel.appendDocument(id, doc);
   },
 
   // ── Process (legacy — kept for local dev; production uses Step Functions) ─

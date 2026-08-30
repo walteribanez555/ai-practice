@@ -1,4 +1,4 @@
-export type ClaimStatus   = 'pending' | 'processing' | 'processed' | 'error';
+export type ClaimStatus   = 'draft' | 'pending' | 'processing' | 'processed' | 'error';
 export type ClaimPriority = 'high' | 'medium' | 'low';
 export type Coverage      = 'full' | 'partial' | 'none' | 'unknown';
 

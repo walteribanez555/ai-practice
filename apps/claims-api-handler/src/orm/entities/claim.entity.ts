@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { docClient, CLAIMS_TABLE } from '../../config/dynamo';
 import { DynamoTable } from '../dynamo-table';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { ClaimStatus, Coverage, Priority } from '../../modules/claim/claim.types';
 
 // ── Shape ─────────────────────────────────────────────────────────────────────
@@ -46,10 +47,7 @@ export interface Claim extends Record<string, unknown> {
   ttl?: number;
 }
 
-export type CreateClaimInput = Pick<
-  Claim,
-  'clientId' | 'documentKey' | 'contentType' | 'fileSizeBytes'
-> & Partial<Pick<Claim, 'policyId'>>;
+export type CreateClaimInput = Pick<Claim, 'clientId'> & Partial<Pick<Claim, 'policyId'>>;
 
 export type UpdateClaimInput = Partial<
   Pick<
@@ -120,17 +118,33 @@ export const ClaimEntity = {
     const now  = new Date().toISOString();
     const item: Claim = {
       id:                  randomUUID(),
-      status:              'pending',
+      status:              'draft',
       clientId:            input.clientId,
-      documentKey:         input.documentKey,
-      contentType:         input.contentType,
-      fileSizeBytes:       input.fileSizeBytes,
+      documentKey:         '',
+      contentType:         '',
+      fileSizeBytes:       0,
+      documents:           [],
       requiresHumanReview: false,
       createdAt:           now,
       updatedAt:           now,
       ...(input.policyId ? { policyId: input.policyId } : {}),
     };
     return table.put(item);
+  },
+
+  async appendDocument(id: string, doc: DocumentRef): Promise<Claim | null> {
+    const res = await docClient.send(new UpdateCommand({
+      TableName:    CLAIMS_TABLE,
+      Key:          { id },
+      UpdateExpression: 'SET documents = list_append(if_not_exists(documents, :empty), :doc), updatedAt = :now',
+      ExpressionAttributeValues: {
+        ':doc':   [doc],
+        ':empty': [],
+        ':now':   new Date().toISOString(),
+      },
+      ReturnValues: 'ALL_NEW',
+    }));
+    return (res.Attributes as Claim) ?? null;
   },
 
   update(id: string, input: UpdateClaimInput): Promise<Claim | null> {

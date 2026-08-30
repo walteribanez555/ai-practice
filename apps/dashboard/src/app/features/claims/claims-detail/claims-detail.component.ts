@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpEventType } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ClaimsService } from '../claims.service';
 import { AuthStore } from '../../auth/store/auth.store';
@@ -24,6 +25,11 @@ export class ClaimsDetailComponent implements OnInit {
 
   processing   = signal(false);
   processMsg   = signal<string | null>(null);
+
+  addingDoc    = signal(false);
+  addDocMsg    = signal<string | null>(null);
+  submitting   = signal(false);
+  submitMsg    = signal<string | null>(null);
 
   updating     = signal(false);
   updateMsg    = signal<string | null>(null);
@@ -115,6 +121,52 @@ export class ClaimsDetailComponent implements OnInit {
   get canProcess() {
     const s = this.claim()?.status;
     return this.store.isAdjuster() && (s === 'pending' || s === 'error');
+  }
+
+  get isDraft() { return this.claim()?.status === 'draft'; }
+
+  onAddDocFile(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file  = input.files?.[0];
+    if (!file) return;
+
+    const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+    const ct  = ext === 'jpg' ? 'jpeg' : ext;
+    if (!['pdf', 'jpeg', 'png'].includes(ct)) {
+      this.addDocMsg.set('Solo se aceptan PDF, JPEG o PNG.'); return;
+    }
+
+    this.addingDoc.set(true);
+    this.addDocMsg.set(null);
+    const id = this.claim()!.id;
+
+    this.claimsService.addDocument(id, ct, file.size).subscribe({
+      next: ({ uploadUrl, mimeType }) => {
+        this.claimsService.uploadToS3(uploadUrl, file, mimeType).subscribe({
+          next: (ev) => {
+            if ((ev as any).type === 4) { // Response
+              this.claimsService.get(id).subscribe(c => this.claim.set(c));
+              this.addDocMsg.set('✓ Documento agregado.');
+              this.addingDoc.set(false);
+            }
+          },
+          error: () => { this.addDocMsg.set('Error al subir el documento.'); this.addingDoc.set(false); },
+        });
+      },
+      error: (e: any) => { this.addDocMsg.set(e?.error?.error ?? 'Error al agregar documento.'); this.addingDoc.set(false); },
+    });
+  }
+
+  submitDraft() {
+    this.submitting.set(true);
+    this.submitMsg.set(null);
+    this.claimsService.submit(this.claim()!.id).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.claimsService.get(this.claim()!.id).subscribe(c => this.claim.set(c));
+      },
+      error: (e: any) => { this.submitMsg.set(e?.error?.error ?? 'Error al enviar.'); this.submitting.set(false); },
+    });
   }
 
   get involvedPartiesStr() {

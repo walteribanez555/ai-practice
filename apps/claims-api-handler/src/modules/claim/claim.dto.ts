@@ -4,19 +4,20 @@ import type { ClaimStatus, Coverage, ExtractedData, Priority } from './claim.typ
 // ── Input DTOs ────────────────────────────────────────────────────────────────
 
 export interface CreateClaimDto {
-  clientId:     string;
-  policyId?:    string;
-  contentType:  string;    // 'pdf' | 'jpeg' | 'png'
-  fileSizeBytes: number;
-  // documentKey is generated server-side now
-  documentKey?: string;
+  clientId?:  string;   // adjuster may specify; client always uses own id
+  policyId?:  string;
 }
 
-export interface CreateClaimResponseDto {
-  claim:     ClaimAdjusterResponseDto;
-  uploadUrl: string;
+export interface AddDocumentDto {
+  contentType:   string;  // 'pdf' | 'jpeg' | 'png'
+  fileSizeBytes: number;
+}
+
+export interface AddDocumentResponseDto {
   documentKey: string;
+  uploadUrl:   string;
   expiresIn:   number;
+  mimeType:    string;
 }
 
 export interface ProcessClaimDto {
