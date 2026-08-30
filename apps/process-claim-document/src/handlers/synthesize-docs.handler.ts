@@ -12,7 +12,7 @@
 
 import type { Handler }    from 'aws-lambda';
 import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
-import { bedrockClient, BEDROCK_MODEL_ID } from '../config/bedrock';
+import { bedrockClient, BEDROCK_MODEL_ID, GUARDRAIL_ID, GUARDRAIL_VERSION } from '../config/bedrock';
 import { createLogger }    from '../config/logger';
 import type { SynthesizeDocsInput, ConsistencyResult, ExtractionResult } from './sf.types';
 
@@ -95,6 +95,9 @@ export const handler: Handler<SynthesizeDocsInput, ConsistencyResult> = async (e
       tools:      [tool],
       toolChoice: { tool: { name: 'analyze_consistency' } },
     },
+    guardrailConfig: GUARDRAIL_ID
+      ? { guardrailIdentifier: GUARDRAIL_ID, guardrailVersion: GUARDRAIL_VERSION, trace: 'enabled' }
+      : undefined,
   }));
 
   const toolBlock = response.output?.message?.content?.find(b => b.toolUse?.name === 'analyze_consistency');

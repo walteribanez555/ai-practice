@@ -2,10 +2,11 @@ import {
   ConverseCommand,
   type ContentBlock,
   type DocumentFormat,
+  type GuardrailConfiguration,
   type ImageFormat,
   type Tool,
 } from '@aws-sdk/client-bedrock-runtime';
-import { bedrockClient, BEDROCK_MODEL_ID } from '../../config/bedrock';
+import { bedrockClient, BEDROCK_MODEL_ID, GUARDRAIL_ID, GUARDRAIL_VERSION } from '../../config/bedrock';
 import { createLogger } from '../../config/logger';
 import {
   CLAIM_EXTRACTION_TOOL,
@@ -84,6 +85,10 @@ function buildContentBlock(buffer: Buffer, contentType: string): ContentBlock {
 
 // ── Core invocation helper ────────────────────────────────────────────────────
 
+const guardrailConfig: GuardrailConfiguration | undefined = GUARDRAIL_ID
+  ? { guardrailIdentifier: GUARDRAIL_ID, guardrailVersion: GUARDRAIL_VERSION, trace: 'enabled' }
+  : undefined;
+
 async function invokeWithTool<T>(
   buffer:       Buffer,
   contentType:  string,
@@ -98,7 +103,8 @@ async function invokeWithTool<T>(
     modelId: BEDROCK_MODEL_ID,
     system:  [{ text: systemPrompt }],
     messages: [{ role: 'user', content: [contentBlock, { text: userPrompt }] }],
-    toolConfig: { tools: [tool], toolChoice: { tool: { name: toolName } } },
+    toolConfig:     { tools: [tool], toolChoice: { tool: { name: toolName } } },
+    guardrailConfig,
   }));
 
   const toolBlock = response.output?.message?.content?.find(b => b.toolUse?.name === toolName);

@@ -200,6 +200,92 @@ export class AssistanceStack extends cdk.Stack {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Bedrock Guardrail — fraud-claims-guardrail
+    //
+    // Applied to every ConverseCommand that processes claim documents.
+    // Three layers of protection:
+    //   1. Content policy   — block hate/sexual/violence in model I/O
+    //   2. PII policy       — BLOCK dangerous PII from model outputs
+    //                         (SSN, credit cards, bank accounts)
+    //                         Names/addresses intentionally left unrestricted
+    //                         because they are core claim extraction data.
+    //   3. Topic denial     — reject off-topic requests embedded in documents
+    //                         (legal advice, medical diagnosis)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const fraudGuardrail = new bedrock.CfnGuardrail(this, "FraudGuardrail", {
+      name:                    `${serviceName}-fraud-claims`,
+      description:             "Protect fraud-scoring pipeline: PII redaction, content filtering, topic denial",
+      blockedInputMessaging:   "This content cannot be processed by the claims analysis system.",
+      blockedOutputsMessaging: "The model output was blocked by the content safety policy.",
+
+      contentPolicyConfig: {
+        filtersConfig: [
+          { type: "HATE",         inputStrength: "HIGH",   outputStrength: "HIGH"   },
+          { type: "INSULTS",      inputStrength: "HIGH",   outputStrength: "HIGH"   },
+          { type: "SEXUAL",       inputStrength: "HIGH",   outputStrength: "HIGH"   },
+          // MEDIUM on violence: accident/injury descriptions are expected in claims
+          { type: "VIOLENCE",     inputStrength: "MEDIUM", outputStrength: "MEDIUM" },
+          { type: "MISCONDUCT",   inputStrength: "HIGH",   outputStrength: "HIGH"   },
+          // Prompt injection guard on inputs only
+          { type: "PROMPT_ATTACK", inputStrength: "HIGH",  outputStrength: "NONE"   },
+        ],
+      },
+
+      sensitiveInformationPolicyConfig: {
+        // Only block PII that must never appear in extracted claim data or DynamoDB.
+        // Names, phones, and addresses are intentionally excluded — they are
+        // required fields in involvedParties and claim extraction.
+        piiEntitiesConfig: [
+          { type: "US_SOCIAL_SECURITY_NUMBER", action: "BLOCK" },
+          { type: "CREDIT_DEBIT_CARD_NUMBER",  action: "BLOCK" },
+          { type: "CREDIT_DEBIT_CARD_CVV",     action: "BLOCK" },
+          { type: "CREDIT_DEBIT_CARD_EXPIRY",  action: "BLOCK" },
+          { type: "US_BANK_ACCOUNT_NUMBER",    action: "BLOCK" },
+          { type: "US_BANK_ROUTING_NUMBER",    action: "BLOCK" },
+          { type: "AWS_ACCESS_KEY",            action: "BLOCK" },
+          { type: "AWS_SECRET_KEY",            action: "BLOCK" },
+          { type: "PASSWORD",                  action: "BLOCK" },
+          { type: "PIN",                       action: "BLOCK" },
+        ],
+      },
+
+      topicPolicyConfig: {
+        topicsConfig: [
+          {
+            name:       "LegalAdvice",
+            definition: "Requests for specific legal advice, legal opinion, legal interpretation of policy terms, or recommendations about legal action.",
+            examples:   ["Should I sue?", "Is this covered by law?", "What are my legal rights?", "Can I take legal action?"],
+            type:       "DENY",
+          },
+          {
+            name:       "MedicalDiagnosis",
+            definition: "Requests for specific medical diagnoses, treatment recommendations, or medical opinions beyond what is documented in the claim.",
+            examples:   ["What injury do I have?", "Should I see a doctor?", "Is this injury serious?"],
+            type:       "DENY",
+          },
+        ],
+      },
+    });
+
+    const guardrailVersion = new bedrock.CfnGuardrailVersion(this, "FraudGuardrailVersion", {
+      guardrailIdentifier: fraudGuardrail.attrGuardrailId,
+      description:         "Initial version — PII block + content filter + topic denial",
+    });
+
+    new cdk.CfnOutput(this, "GuardrailId", {
+      value:       fraudGuardrail.attrGuardrailId,
+      description: "Bedrock Guardrail ID — fraud-claims",
+      exportName:  `${serviceName}-guardrail-id`,
+    });
+
+    new cdk.CfnOutput(this, "GuardrailVersion", {
+      value:       guardrailVersion.attrVersion,
+      description: "Bedrock Guardrail version in use",
+      exportName:  `${serviceName}-guardrail-version`,
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Lambda 1 — process-claim-document (internal, no API Gateway)
     //
     // Invoked directly (e.g. from SQS, EventBridge, or direct Invoke call).
@@ -226,6 +312,12 @@ export class AssistanceStack extends cdk.Stack {
       ],
     }));
 
+    processClaimRole.addToPolicy(new iam.PolicyStatement({
+      sid:       "AllowBedrockGuardrail",
+      actions:   ["bedrock:ApplyGuardrail"],
+      resources: [fraudGuardrail.attrGuardrailArn],
+    }));
+
     // S3: allow reading claim documents to send them to Bedrock for analysis.
     documentsBucket.grantRead(processClaimRole);
 
@@ -246,8 +338,9 @@ export class AssistanceStack extends cdk.Stack {
       memorySize:   512,
       environment: {
         ...sharedEnv,
-        // Override via env var to switch models without a redeploy
-        BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID ?? "us.amazon.nova-pro-v1:0",
+        BEDROCK_MODEL_ID:  process.env.BEDROCK_MODEL_ID ?? "us.amazon.nova-pro-v1:0",
+        GUARDRAIL_ID:      fraudGuardrail.attrGuardrailId,
+        GUARDRAIL_VERSION: guardrailVersion.attrVersion,
       },
       logGroup:     processClaimLogGroup,
       bundling:     sharedBundling,
@@ -401,7 +494,9 @@ export class AssistanceStack extends cdk.Stack {
 
     const sfDocAnalysisEnv = {
       ...sharedEnv,
-      BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID ?? "us.amazon.nova-pro-v1:0",
+      BEDROCK_MODEL_ID:    process.env.BEDROCK_MODEL_ID ?? "us.amazon.nova-pro-v1:0",
+      GUARDRAIL_ID:        fraudGuardrail.attrGuardrailId,
+      GUARDRAIL_VERSION:   guardrailVersion.attrVersion,
     };
 
     // Shared IAM role for doc-analysis Lambdas (need Bedrock + S3 read)
@@ -418,6 +513,13 @@ export class AssistanceStack extends cdk.Stack {
         `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
       ],
     }));
+
+    sfDocAnalysisRole.addToPolicy(new iam.PolicyStatement({
+      sid:       "AllowBedrockGuardrail",
+      actions:   ["bedrock:ApplyGuardrail"],
+      resources: [fraudGuardrail.attrGuardrailArn],
+    }));
+
     documentsBucket.grantRead(sfDocAnalysisRole);
     appSecret.grantRead(sfDocAnalysisRole);
 

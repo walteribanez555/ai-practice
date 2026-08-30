@@ -33,10 +33,10 @@ export const handler: Handler = async () => {
   await sm.send(new CreateProcessingJobCommand({
     ProcessingJobName: jobName,
 
-    // ml.m5.large: 2 vCPU, 8 GB RAM — enough for 15k rows XGBoost
+    // ml.t3.medium: 2 vCPU, 4 GB RAM — enough for 15k rows XGBoost, higher default quota
     ProcessingResources: {
       ClusterConfig: {
-        InstanceType:   'ml.m5.large',
+        InstanceType:   'ml.t3.medium',
         InstanceCount:  1,
         VolumeSizeInGB: 20,
       },
