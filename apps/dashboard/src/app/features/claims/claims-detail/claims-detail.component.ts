@@ -107,15 +107,28 @@ export class ClaimsDetailComponent implements OnInit {
   }
 
   statusLabel(s: string) {
-    const map: Record<string, string> = { pending: 'Pendiente', processing: 'Procesando', processed: 'Procesado', error: 'Error' };
+    const map: Record<string, string> = {
+      draft:      'Borrador',
+      pending:    'Pendiente',
+      processing: 'Procesando',
+      processed:  'Procesado',
+      approved:   'Aprobado',
+      rejected:   'Rechazado',
+      needs_info: 'Requiere información',
+      error:      'Error',
+    };
     return map[s] ?? s;
   }
 
   statusClass(s: string) {
     const map: Record<string, string> = {
-      pending:    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+      draft:      'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+      pending:    'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
       processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      processed:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      processed:  'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+      approved:   'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      rejected:   'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+      needs_info: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
       error:      'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
     };
     return map[s] ?? 'bg-gray-100 text-gray-800';
@@ -124,6 +137,23 @@ export class ClaimsDetailComponent implements OnInit {
   get canProcess() {
     const s = this.claim()?.status;
     return this.store.isAdjuster() && (s === 'pending' || s === 'error');
+  }
+
+  get canDecide() {
+    return this.store.isAdjuster() && this.claim()?.status === 'processed';
+  }
+
+  deciding    = signal(false);
+  decisionMsg = signal<string | null>(null);
+  decisionNote = '';
+
+  decide(decision: 'approved' | 'rejected' | 'needs_info') {
+    this.deciding.set(true);
+    this.decisionMsg.set(null);
+    this.claimsService.decide(this.claim()!.id, decision, this.decisionNote || undefined).subscribe({
+      next: (c) => { this.claim.set(c); this.deciding.set(false); this.decisionNote = ''; },
+      error: (e: any) => { this.decisionMsg.set(e?.error?.error ?? 'Error al registrar decisión.'); this.deciding.set(false); },
+    });
   }
 
   get isDraft() { return this.claim()?.status === 'draft'; }

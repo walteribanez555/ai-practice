@@ -37,6 +37,10 @@ export class ClaimsService {
     return this.http.post<{ id: string; status: string; message: string }>(`${this.base}/${id}/process`, {});
   }
 
+  decide(id: string, decision: 'approved' | 'rejected' | 'needs_info', note?: string) {
+    return this.http.post<import('./claims.models').Claim>(`${this.base}/${id}/decision`, { decision, note });
+  }
+
   update(id: string, body: UpdateClaimPayload) {
     return this.http.patch<Claim>(`${this.base}/${id}`, body);
   }

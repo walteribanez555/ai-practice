@@ -125,6 +125,15 @@ export const ClaimService = {
     return ClaimModel.softDelete(id);
   },
 
+  applyDecision(id: string, decision: 'approved' | 'rejected' | 'needs_info', note?: string, decidedBy?: string) {
+    return ClaimModel.update(id, {
+      status:       decision,
+      adjusterNote: note,
+      decisionAt:   new Date().toISOString(),
+      decidedBy,
+    });
+  },
+
   // ── Business logic (pure functions) ──────────────────────────────────────
 
   _computeFraudScore(

@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import type { Context } from 'hono';
 import type { AppEnv } from '../../app.types';
 import { ClaimService } from './claim.service';
-import type { CreateClaimDto, AddDocumentDto, UpdateClaimDto } from './claim.dto';
+import type { CreateClaimDto, AddDocumentDto, UpdateClaimDto, DecisionDto } from './claim.dto';
 import { toAdjusterResponse, toClientResponse } from './claim.dto';
 import { createLogger } from '../../config';
 import { S3Service } from '../../common/services/s3.service';
@@ -174,6 +174,27 @@ export const ClaimController = {
     const body  = await c.req.json<UpdateClaimDto>();
     const claim = await ClaimService.update(id, body);
     return c.json(toAdjusterResponse(claim));
+  },
+
+  // ── POST /claims/:id/decision — adjuster only ────────────────────────────
+  async decide(c: Context<AppEnv>) {
+    const id      = c.req.param('id') ?? '';
+    const body    = await c.req.json<DecisionDto>();
+    const userId  = c.get('userId');
+    const claim   = await ClaimService.findById(id);
+
+    if (!claim || claim.deletedAt) return c.json({ error: 'Claim not found.', code: 'CLAIM_NOT_FOUND' }, 404);
+    if (claim.status !== 'processed') {
+      return c.json({ error: `Cannot decide on a claim in status "${claim.status}".`, code: 'INVALID_STATUS_TRANSITION' }, 422);
+    }
+    if (!['approved', 'rejected', 'needs_info'].includes(body.decision)) {
+      return c.json({ error: 'decision must be approved, rejected, or needs_info.', code: 'INVALID_DECISION' }, 400);
+    }
+
+    const updated = await ClaimService.applyDecision(id, body.decision, body.note, userId);
+
+    logger.info('Claim decision recorded', { id, decision: body.decision, decidedBy: userId });
+    return c.json(toAdjusterResponse(updated!));
   },
 
   // ── DELETE /claims/:id — soft delete, adjuster only ─────────────────────

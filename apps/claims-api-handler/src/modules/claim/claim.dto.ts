@@ -29,6 +29,11 @@ export interface ProcessClaimDto {
   };
 }
 
+export interface DecisionDto {
+  decision: 'approved' | 'rejected' | 'needs_info';
+  note?:    string;
+}
+
 export interface UpdateClaimDto {
   claimType?: string;
   estimatedAmount?: number;
@@ -65,7 +70,13 @@ export interface ClaimAdjusterResponseDto extends ClaimClientResponseDto {
   requiresHumanReview: boolean;
   priority:            Priority | null;
   errorReason:         string | null;
-  documentAnalyses:    DocumentAnalysis[];
+  documentAnalyses:      DocumentAnalysis[];
+  crossDocConsistent?:   boolean;
+  crossDocObservations?: string;
+  coverageClause?:       string;
+  adjusterNote?:         string;
+  decisionAt?:           string;
+  decidedBy?:            string;
 }
 
 // ── Mappers ───────────────────────────────────────────────────────────────────
@@ -94,5 +105,11 @@ export const toAdjusterResponse = (c: Claim): ClaimAdjusterResponseDto => ({
   requiresHumanReview: c.requiresHumanReview,
   priority:            c.priority             ?? null,
   errorReason:         c.errorReason          ?? null,
-  documentAnalyses:    c.documentAnalyses     ?? [],
+  documentAnalyses:      c.documentAnalyses      ?? [],
+  crossDocConsistent:    c.crossDocConsistent,
+  crossDocObservations:  c.crossDocObservations,
+  coverageClause:        c.coverageClause,
+  adjusterNote:          c.adjusterNote,
+  decisionAt:            c.decisionAt,
+  decidedBy:             c.decidedBy,
 });

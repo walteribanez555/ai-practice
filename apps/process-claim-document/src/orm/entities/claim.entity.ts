@@ -50,7 +50,10 @@ export interface Claim extends Record<string, unknown> {
   fraudRiskScore?: number;
   riskJustification?: string;
   // Coverage decision
-  coverageApplies?: Coverage;
+  coverageApplies?:      Coverage;
+  coverageClause?:       string;
+  crossDocConsistent?:   boolean;
+  crossDocObservations?: string;
   // Routing
   requiresHumanReview: boolean;
   priority?: Priority;
@@ -87,6 +90,9 @@ export type UpdateClaimInput = Partial<
     | 'processedAt'
     | 'updatedAt'
     | 'documentAnalyses'
+    | 'coverageClause'
+    | 'crossDocConsistent'
+    | 'crossDocObservations'
   >
 >;
 

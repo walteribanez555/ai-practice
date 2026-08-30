@@ -1,4 +1,4 @@
-export type ClaimStatus   = 'draft' | 'pending' | 'processing' | 'processed' | 'error';
+export type ClaimStatus   = 'draft' | 'pending' | 'processing' | 'processed' | 'approved' | 'rejected' | 'needs_info' | 'error';
 export type ClaimPriority = 'high' | 'medium' | 'low';
 export type Coverage      = 'full' | 'partial' | 'none' | 'unknown';
 
@@ -36,9 +36,15 @@ export interface Claim {
   riskJustification?:  string | null;
   requiresHumanReview?: boolean;
   priority?:           ClaimPriority | null;
-  errorReason?:        string | null;
-  documents?:          { key: string; contentType: string; fileSizeBytes?: number }[];
-  documentAnalyses?:   DocumentAnalysis[];
+  errorReason?:          string | null;
+  documents?:            { key: string; contentType: string; fileSizeBytes?: number }[];
+  documentAnalyses?:     DocumentAnalysis[];
+  crossDocConsistent?:   boolean;
+  crossDocObservations?: string;
+  coverageClause?:       string;
+  adjusterNote?:         string;
+  decisionAt?:           string;
+  decidedBy?:            string;
 }
 
 export interface CreateClaimPayload {

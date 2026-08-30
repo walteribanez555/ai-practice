@@ -510,6 +510,19 @@ export class AssistanceStack extends cdk.Stack {
       bundling:     sharedBundling,
     });
 
+    const synthesizeDocsFn = new lambdaNodejs.NodejsFunction(this, "SynthesizeDocsFn", {
+      functionName: `${serviceName}-synthesize-docs`,
+      description:  "SF Phase2 step — cross-document consistency analysis via Bedrock",
+      runtime:      lambda.Runtime.NODEJS_22_X,
+      entry:        path.join(__dirname, `${handlersBase}/synthesize-docs.handler.ts`),
+      handler:      "handler",
+      role:         sfDocAnalysisRole,
+      timeout:      cdk.Duration.seconds(60),
+      memorySize:   512,
+      environment:  sfDocAnalysisEnv,
+      bundling:     sharedBundling,
+    });
+
     const aggregateRiskFn = new lambdaNodejs.NodejsFunction(this, "AggregateRiskFn", {
       functionName: `${serviceName}-aggregate-risk`,
       description:  "SF final step — merge all analyses, compute fraud score, update DynamoDB",
@@ -577,48 +590,69 @@ export class AssistanceStack extends cdk.Stack {
     });
     checkHistoryTask.addRetry(lambdaRetry);
 
+    // ── Phase 1 parallel: doc analysis ∥ history ─────────────────────────────
+    const phase1Parallel = new sfn.Parallel(this, "Phase1Parallel", {
+      comment:    "Phase 1 — extract all documents and check claim history simultaneously",
+      resultPath: sfn.JsonPath.stringAt("$.phase1Results"),
+    });
+    phase1Parallel.branch(mapDocuments);
+    phase1Parallel.branch(checkHistoryTask);
+
+    // ── Phase 2 parallel: synthesis ∥ coverage (use Phase 1 extraction data) ─
+    const synthesizeDocsTask = new tasks.LambdaInvoke(this, "SynthesizeDocs", {
+      lambdaFunction:    synthesizeDocsFn,
+      payloadResponseOnly: true,
+      payload:           sfn.TaskInput.fromObject({
+        "claimId.$":    "$.claimId",
+        "extractions.$": "$.phase1Results[0]",
+      }),
+      comment: "Cross-document consistency analysis using actual extracted data",
+    });
+    synthesizeDocsTask.addRetry(lambdaRetry);
+
     const checkCoverageTask = new tasks.LambdaInvoke(this, "CheckCoverage", {
       lambdaFunction:    checkCoverageFn,
       payloadResponseOnly: true,
       payload:           sfn.TaskInput.fromObject({
         "claimId.$":      "$.claimId",
+        "extractions.$":  "$.phase1Results[0]",
         "claimContext.$": "$.claimContext",
       }),
-      comment: "Query Bedrock Knowledge Base to verify policy coverage",
+      comment: "Policy coverage check with real extraction context",
     });
     checkCoverageTask.addRetry(lambdaRetry);
 
-    // Top-level parallel: documents ∥ history ∥ coverage
-    const topParallel = new sfn.Parallel(this, "ClaimAnalysisParallel", {
-      comment:    "Run all analysis branches simultaneously",
-      resultPath: sfn.JsonPath.stringAt("$.analysisResults"),
+    const phase2Parallel = new sfn.Parallel(this, "Phase2Parallel", {
+      comment:    "Phase 2 — cross-doc synthesis and coverage check using extracted data",
+      resultPath: sfn.JsonPath.stringAt("$.phase2Results"),
     });
-    topParallel.branch(mapDocuments);
-    topParallel.branch(checkHistoryTask);
-    topParallel.branch(checkCoverageTask);
+    phase2Parallel.branch(synthesizeDocsTask);
+    phase2Parallel.branch(checkCoverageTask);
 
-    // Final aggregation
+    // ── Final aggregation ─────────────────────────────────────────────────────
     const aggregateRiskTask = new tasks.LambdaInvoke(this, "AggregateRisk", {
       lambdaFunction:    aggregateRiskFn,
       payloadResponseOnly: true,
-      comment:           "Merge all analyses into composite fraud score and update DynamoDB",
+      comment:           "Merge all phase results, compute fraud score, update DynamoDB",
     });
     aggregateRiskTask.addRetry({ ...lambdaRetry, maxAttempts: 2 });
 
-    // Error catch — resultPath merges error info into the original input so $.claimId is still accessible.
-    // handleError routes to aggregateRiskTask so the claim is marked as error in DynamoDB.
+    // Error catch — preserves $.claimId so aggregate-risk can mark claim as error
     const handleError = new sfn.Pass(this, "PropagateError", {
       parameters: {
         "claimId.$": "$.claimId",
         "error.$":   "$.sfnError.Error",
         "cause.$":   "$.sfnError.Cause",
       },
-      comment: "Capture error details for downstream logging",
     });
     handleError.next(aggregateRiskTask);
 
-    const definition = topParallel
+    const definition = phase1Parallel
       .addCatch(handleError, { errors: ["States.ALL"], resultPath: "$.sfnError" })
+      .next(
+        phase2Parallel
+          .addCatch(handleError, { errors: ["States.ALL"], resultPath: "$.sfnError" })
+      )
       .next(aggregateRiskTask);
 
     // Step Functions execution role
@@ -626,7 +660,7 @@ export class AssistanceStack extends cdk.Stack {
       roleName:  `${serviceName}-sfn-role`,
       assumedBy: new iam.ServicePrincipal("states.amazonaws.com"),
     });
-    [extractDataFn, analyzeIntegrityFn, checkHistoryFn, checkCoverageFn, aggregateRiskFn]
+    [extractDataFn, analyzeIntegrityFn, checkHistoryFn, synthesizeDocsFn, checkCoverageFn, aggregateRiskFn]
       .forEach((fn) => fn.grantInvoke(sfnRole));
 
     const claimProcessingStateMachine = new sfn.StateMachine(this, "ClaimProcessingStateMachine", {

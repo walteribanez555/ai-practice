@@ -20,3 +20,4 @@ claimRouter.get('/:id',                 ClaimController.findById);
 claimRouter.post('/',                   ClaimController.create);
 claimRouter.post('/:id/documents',      ClaimController.addDocument);
 claimRouter.post('/:id/submit',         ClaimController.submit);
+claimRouter.post('/:id/decision',       requireRole('adjuster'), ClaimController.decide);

@@ -47,6 +47,12 @@ export interface Claim extends Record<string, unknown> {
   priority?:           Priority;
   errorReason?:        string;
   deletedAt?:          string;
+  adjusterNote?:       string;
+  decisionAt?:         string;
+  decidedBy?:          string;
+  crossDocConsistent?: boolean;
+  crossDocObservations?: string;
+  coverageClause?:     string;
   createdAt:           string;
   updatedAt:           string;
   processedAt?:        string;
@@ -74,6 +80,12 @@ export type UpdateClaimInput = Partial<
     | 'updatedAt'
     | 'deletedAt'
     | 'documentAnalyses'
+    | 'adjusterNote'
+    | 'decisionAt'
+    | 'decidedBy'
+    | 'crossDocConsistent'
+    | 'crossDocObservations'
+    | 'coverageClause'
   >
 >;
 
