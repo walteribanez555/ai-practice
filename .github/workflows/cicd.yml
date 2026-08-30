@@ -201,6 +201,32 @@ jobs:
             -c environment=${{ env.ENVIRONMENT }} \
             --require-approval never
 
+      - name: Setup Bedrock Knowledge Base (first deploy only)
+        run: |
+          KB_COUNT=$(aws bedrock-agent list-knowledge-bases \
+            --query 'length(knowledgeBaseSummaries)' --output text 2>/dev/null || echo "0")
+
+          if [[ "$KB_COUNT" == "0" ]]; then
+            echo "No KB found — running setup-kb.sh..."
+            bash scripts/setup-kb.sh
+          else
+            echo "✅ Knowledge Base already exists ($KB_COUNT found) — skipping."
+          fi
+
+      - name: Seed default users (first deploy only)
+        run: |
+          USER_COUNT=$(aws dynamodb scan \
+            --table-name assistance-prod-users \
+            --select COUNT \
+            --query 'Count' --output text 2>/dev/null || echo "0")
+
+          if [[ "$USER_COUNT" == "0" ]]; then
+            echo "No users found — seeding..."
+            USERS_TABLE_NAME=assistance-prod-users node scripts/seed-users.mjs
+          else
+            echo "✅ Users already exist ($USER_COUNT found) — skipping."
+          fi
+
   # ─── 4. Deploy process-claim-document (internal Lambda) ─────────────────────
   deploy-process-claim:
     name: Deploy process-claim-document

@@ -3,7 +3,6 @@ import { Component, ElementRef, QueryList, ViewChildren, ChangeDetectorRef, inje
 import { SidebarService } from '../../services/sidebar.service';
 import { NavigationEnd, Router, RouterModule } from '@angular/router';
 import { SafeHtmlPipe } from '../../pipe/safe-html.pipe';
-import { SidebarWidgetComponent } from './app-sidebar-widget.component';
 import { combineLatest, Subscription } from 'rxjs';
 import { AuthStore } from '../../../features/auth/store/auth.store';
 
@@ -21,7 +20,6 @@ type NavItem = {
     CommonModule,
     RouterModule,
     SafeHtmlPipe,
-    SidebarWidgetComponent
   ],
   templateUrl: './app-sidebar.component.html',
 })
