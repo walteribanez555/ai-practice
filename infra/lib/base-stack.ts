@@ -326,53 +326,12 @@ export class AssistanceStack extends cdk.Stack {
       },
     });
 
-    // Bedrock Knowledge Base pointing to OpenSearch managed cluster
-    const policiesKb = new bedrock.CfnKnowledgeBase(this, "PoliciesKB", {
-      name:    `${serviceName}-policies-kb`,
-      roleArn: kbRole.roleArn,
-      knowledgeBaseConfiguration: {
-        type: "VECTOR",
-        vectorKnowledgeBaseConfiguration: {
-          embeddingModelArn: `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
-        },
-      },
-      storageConfiguration: {
-        type: "OPENSEARCH_MANAGED_CLUSTER",
-        opensearchManagedClusterConfiguration: {
-          domainArn:       osDomain.domainArn,
-          domainEndpoint:  `https://${osDomain.domainEndpoint}`,
-          vectorIndexName: "policies-index",
-          fieldMapping: {
-            vectorField:   "bedrock-knowledge-base-default-vector",
-            textField:     "AMAZON_BEDROCK_TEXT_CHUNK",
-            metadataField: "AMAZON_BEDROCK_METADATA",
-          },
-        },
-      },
-    });
-    // KB must wait for the index to exist before creation
-    policiesKb.node.addDependency(osIndexResource);
+    // Bedrock Knowledge Base — created manually via CLI (CloudFormation lacks
+    // bedrock:CreateKnowledgeBase permission in this account's execution role).
+    // After CDK deploy, run scripts/setup-kb.sh to create KB + data source,
+    // then update KNOWLEDGE_BASE_ID in the app secret or Lambda env var.
 
-    // Data source — S3 bucket with policy documents, chunked at 512 tokens
-    new bedrock.CfnDataSource(this, "PoliciesDataSource", {
-      knowledgeBaseId: policiesKb.attrKnowledgeBaseId,
-      name:            `${serviceName}-policies-docs`,
-      dataSourceConfiguration: {
-        type: "S3",
-        s3Configuration: { bucketArn: policiesBucket.bucketArn },
-      },
-      vectorIngestionConfiguration: {
-        chunkingConfiguration: {
-          chunkingStrategy: "FIXED_SIZE",
-          fixedSizeChunkingConfiguration: {
-            maxTokens:          512,
-            overlapPercentage:  20,
-          },
-        },
-      },
-    });
-
-    // Allow Bedrock KB to read S3 (Titan embedding calls go through Bedrock service)
+    // Allow Bedrock KB to read S3 + call Titan embeddings (used by the manually created KB)
     kbRole.addToPolicy(new iam.PolicyStatement({
       sid:     "AllowTitanEmbedding",
       actions: ["bedrock:InvokeModel"],
@@ -381,16 +340,28 @@ export class AssistanceStack extends cdk.Stack {
       ],
     }));
 
-    new cdk.CfnOutput(this, "KnowledgeBaseId", {
-      value:       policiesKb.attrKnowledgeBaseId,
-      description: "Bedrock Knowledge Base ID — use to start ingestion job",
-      exportName:  `${serviceName}-knowledge-base-id`,
-    });
-
     new cdk.CfnOutput(this, "OpenSearchDomainEndpoint", {
       value:       osDomain.domainEndpoint,
       description: "OpenSearch domain endpoint",
       exportName:  `${serviceName}-opensearch-endpoint`,
+    });
+
+    new cdk.CfnOutput(this, "OpenSearchDomainArn", {
+      value:       osDomain.domainArn,
+      description: "OpenSearch domain ARN — needed for manual KB creation",
+      exportName:  `${serviceName}-opensearch-arn`,
+    });
+
+    new cdk.CfnOutput(this, "KnowledgeBaseRoleArn", {
+      value:       kbRole.roleArn,
+      description: "IAM role ARN for Bedrock Knowledge Base — use in manual KB creation",
+      exportName:  `${serviceName}-kb-role-arn`,
+    });
+
+    new cdk.CfnOutput(this, "PoliciesBucketName", {
+      value:       policiesBucket.bucketName,
+      description: "S3 bucket with policy documents — data source for the KB",
+      exportName:  `${serviceName}-policies-bucket`,
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -441,7 +412,7 @@ export class AssistanceStack extends cdk.Stack {
     sfQueryRole.addToPolicy(new iam.PolicyStatement({
       sid:     "AllowBedrockRetrieve",
       actions: ["bedrock:Retrieve"],
-      resources: [policiesKb.attrKnowledgeBaseArn],
+      resources: [`arn:aws:bedrock:${this.region}:${this.account}:knowledge-base/*`],
     }));
     appSecret.grantRead(sfQueryRole);
 
@@ -512,7 +483,9 @@ export class AssistanceStack extends cdk.Stack {
       memorySize:   256,
       environment: {
         ...sharedEnv,
-        KNOWLEDGE_BASE_ID: policiesKb.attrKnowledgeBaseId,
+        // KNOWLEDGE_BASE_ID is set via 'aws lambda update-function-configuration'
+        // after the KB is created manually with scripts/setup-kb.sh
+        KNOWLEDGE_BASE_ID: process.env.KNOWLEDGE_BASE_ID ?? "",
       },
       bundling:     sharedBundling,
     });
