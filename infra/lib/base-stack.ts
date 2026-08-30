@@ -201,11 +201,12 @@ export class AssistanceStack extends cdk.Stack {
 
     // Bedrock: allow invoking any foundation model and cross-region inference profile.
     // ConverseCommand maps to bedrock:InvokeModel at the IAM level.
+    // Wildcard region required: cross-region inference profiles (us.*) route to other regions at runtime.
     processClaimRole.addToPolicy(new iam.PolicyStatement({
       sid:     "AllowBedrockInvoke",
       actions: ["bedrock:InvokeModel"],
       resources: [
-        `arn:aws:bedrock:${this.region}::foundation-model/*`,
+        `arn:aws:bedrock:*::foundation-model/*`,
         `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
       ],
     }));
@@ -398,7 +399,7 @@ export class AssistanceStack extends cdk.Stack {
       sid:     "AllowBedrockInvoke",
       actions: ["bedrock:InvokeModel"],
       resources: [
-        `arn:aws:bedrock:${this.region}::foundation-model/*`,
+        `arn:aws:bedrock:*::foundation-model/*`,
         `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
       ],
     }));
@@ -578,18 +579,18 @@ export class AssistanceStack extends cdk.Stack {
       comment:           "Merge all analyses into composite fraud score and update DynamoDB",
     });
 
-    // Error catch — mark claim as error in DynamoDB via aggregateRiskFn
+    // Error catch — resultPath merges error info into the original input so $.claimId is still accessible
     const handleError = new sfn.Pass(this, "PropagateError", {
       parameters: {
         "claimId.$": "$.claimId",
-        "error.$":   "$.Error",
-        "cause.$":   "$.Cause",
+        "error.$":   "$.sfnError.Error",
+        "cause.$":   "$.sfnError.Cause",
       },
       comment: "Capture error details for downstream logging",
     });
 
     const definition = topParallel
-      .addCatch(handleError, { errors: ["States.ALL"] })
+      .addCatch(handleError, { errors: ["States.ALL"], resultPath: "$.sfnError" })
       .next(aggregateRiskTask);
 
     // Step Functions execution role
