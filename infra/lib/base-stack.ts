@@ -22,6 +22,7 @@ import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as events from "aws-cdk-lib/aws-events";
 import * as eventsTargets from "aws-cdk-lib/aws-events-targets";
+import * as cloudtrail from "aws-cdk-lib/aws-cloudtrail";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -1308,6 +1309,62 @@ export class AssistanceStack extends cdk.Stack {
       targets:     [new eventsTargets.LambdaFunction(fraudRetrainTriggerFn, {
         retryAttempts: 2,
       })],
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Audit — CloudTrail
+    //
+    // Captures:
+    //   Management events  — IAM, Lambda updates, CDK deploys, config changes
+    //   Data events        — DynamoDB claims table R/W (who read which claim)
+    //                      — S3 documents bucket R/W (who downloaded a document)
+    //
+    // Logs land in two places:
+    //   S3 (90-day retention, RETAIN on stack deletion — never lose audit logs)
+    //   CloudWatch Logs (3-month retention — queryable via Insights)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const trailBucket = new s3.Bucket(this, "TrailBucket", {
+      bucketName:        `${serviceName}-cloudtrail-logs`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL:        true,
+      // Audit logs must survive stack deletion
+      removalPolicy:     cdk.RemovalPolicy.RETAIN,
+      lifecycleRules: [{
+        id:         "expire-old-trail-logs",
+        expiration: cdk.Duration.days(90),
+        enabled:    true,
+      }],
+    });
+
+    const trail = new cloudtrail.Trail(this, "AuditTrail", {
+      trailName:                  `${serviceName}-audit`,
+      bucket:                     trailBucket,
+      isMultiRegionTrail:         false,
+      includeGlobalServiceEvents: true,   // captures IAM global events
+      enableFileValidation:       true,   // tamper-evident log integrity
+      sendToCloudWatchLogs:       true,
+      cloudWatchLogsRetention:    logs.RetentionDays.THREE_MONTHS,
+    });
+
+    // Data events — S3 documents bucket (GetObject/PutObject — who downloaded a claim file)
+    // DynamoDB item-level events are captured via management events at the table level
+    trail.addEventSelector(
+      cloudtrail.DataResourceType.S3_OBJECT,
+      [`${documentsBucket.bucketArn}/`],
+      { readWriteType: cloudtrail.ReadWriteType.ALL },
+    );
+
+    new cdk.CfnOutput(this, "TrailBucketName", {
+      value:       trailBucket.bucketName,
+      description: "S3 bucket for CloudTrail audit logs (90-day retention, RETAIN policy)",
+      exportName:  `${serviceName}-trail-bucket`,
+    });
+
+    new cdk.CfnOutput(this, "TrailArn", {
+      value:       trail.trailArn,
+      description: "CloudTrail ARN — query logs via CloudWatch Insights or Athena",
+      exportName:  `${serviceName}-trail-arn`,
     });
 
     new cdk.CfnOutput(this, "MlBucketName", {

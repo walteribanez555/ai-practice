@@ -60,7 +60,7 @@ export interface ClaimClientResponseDto {
   documents:          DocumentRef[];
 }
 
-/** Full view for the adjuster — includes internal risk data. */
+/** Full view for the adjuster — includes internal risk data. fraudScoringMethod is intentionally omitted (internal implementation detail). */
 export interface ClaimAdjusterResponseDto extends ClaimClientResponseDto {
   clientId:            string;
   policyId:            string | null;
