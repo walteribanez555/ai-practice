@@ -71,7 +71,18 @@ export const ClaimController = {
     logger.info('Claim create', { clientId, contentType: body.contentType });
 
     const claim = await ClaimService.create({ ...body, clientId });
-    return c.json(toAdjusterResponse(claim), 201);
+
+    // Auto-trigger processing immediately after creation
+    const documents = [{ key: claim.documentKey, contentType: claim.contentType, fileSizeBytes: claim.fileSizeBytes }];
+    await ClaimService.markProcessing(claim.id);
+    await sfnClient.send(new StartExecutionCommand({
+      stateMachineArn: SF_ARN,
+      name:            `claim-${claim.id}-${Date.now()}`,
+      input:           JSON.stringify({ claimId: claim.id, clientId: claim.clientId, documents }),
+    }));
+    logger.info('Auto-started claim processing', { id: claim.id });
+
+    return c.json(toAdjusterResponse({ ...claim, status: 'processing' }), 201);
   },
 
   // ── POST /claims/:id/process — adjuster only ─────────────────────────────
