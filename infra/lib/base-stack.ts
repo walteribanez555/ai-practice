@@ -131,10 +131,10 @@ export class AssistanceStack extends cdk.Stack {
       ],
       cors: [
         {
-          // Browsers need to PUT directly via presigned URL
+          // Wildcard headers required: browser preflight may include headers beyond content-type
           allowedMethods: [s3.HttpMethods.PUT],
           allowedOrigins: ["*"],
-          allowedHeaders: ["content-type", "content-length"],
+          allowedHeaders: ["*"],
           maxAge:         3000,
         },
       ],
