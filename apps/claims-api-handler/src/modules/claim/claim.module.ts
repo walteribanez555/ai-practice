@@ -8,6 +8,12 @@ export const claimRouter = new Hono<AppEnv>();
 // All claim routes require a valid JWT
 claimRouter.use('*', authMiddleware);
 
+// ── GDPR routes — must be registered before /:id to avoid param conflicts ─────
+// Art. 17 — right to erasure (adjuster processes on behalf of data subject)
+claimRouter.delete('/gdpr/erase/:clientId',  requireRole('adjuster'), ClaimController.gdprErase);
+// Art. 20 — right to data portability (client or adjuster)
+claimRouter.get('/gdpr/export/:clientId',    ClaimController.gdprExport);
+
 // ── Adjuster-only routes ───────────────────────────────────────────────────────
 claimRouter.get('/',             requireRole('adjuster'), ClaimController.findAll);
 claimRouter.post('/:id/process', requireRole('adjuster'), ClaimController.process);

@@ -899,6 +899,8 @@ export class AssistanceStack extends cdk.Stack {
     });
     claimsApiRole.addToPolicy(dynamoPolicy);
     appSecret.grantRead(claimsApiRole);
+    // grantReadWrite includes s3:DeleteObject — required for GDPR Art. 17 erasure
+    // (DELETE /claims/gdpr/erase/:clientId removes all S3 documents for a clientId)
     documentsBucket.grantReadWrite(claimsApiRole);
     claimsApiRole.addToPolicy(new iam.PolicyStatement({
       sid:       "AllowStartClaimProcessing",

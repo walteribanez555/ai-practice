@@ -2,6 +2,7 @@ import { ClaimModel } from './claim.model';
 import { BadRequestException, NotFoundException, UnprocessableException } from '../../common/exceptions';
 import type { Claim, CreateClaimInput, DocumentRef } from '../../orm/entities/claim.entity';
 import type { CreateClaimDto, ProcessClaimDto, UpdateClaimDto } from './claim.dto';
+import { S3Service } from '../../common/services/s3.service';
 import {
   ALLOWED_CONTENT_TYPES,
   FRAUD_SIGNALS,
@@ -42,7 +43,8 @@ export const ClaimService = {
   async create(dto: CreateClaimDto): Promise<Claim> {
     return ClaimModel.create({
       clientId: dto.clientId ?? '',
-      ...(dto.policyId ? { policyId: dto.policyId } : {}),
+      ...(dto.policyId    ? { policyId:      dto.policyId                } : {}),
+      ...(dto.gdprConsent ? { gdprConsentAt: new Date().toISOString()    } : {}),
     });
   },
 
@@ -123,6 +125,34 @@ export const ClaimService = {
 
   softDelete(id: string) {
     return ClaimModel.softDelete(id);
+  },
+
+  // GDPR Art. 17 — erase all personal data for a clientId.
+  // For each claim: deletes S3 documents then anonymizes the DynamoDB record.
+  // The structural record (id, status, fraudRiskScore, timestamps) is retained
+  // for audit and actuarial purposes — it contains no personal data after anonymization.
+  async eraseByClientId(clientId: string, s3: S3Service): Promise<{ erased: number }> {
+    const claims = await ClaimModel.findAllByClientId(clientId);
+    if (!claims.length) return { erased: 0 };
+
+    await Promise.all(
+      claims.map(async (claim) => {
+        // Delete S3 documents first — irreversible, so do before DynamoDB update
+        const keys = (claim.documents ?? []).map(d => d.key);
+        await Promise.allSettled(keys.map(key => s3.deleteObject(key)));
+        // Anonymize the DynamoDB record
+        await ClaimModel.anonymize(claim.id);
+      })
+    );
+
+    return { erased: claims.length };
+  },
+
+  // GDPR Art. 20 — portable export of all data for a clientId.
+  // Returns the full claim set including adjuster-visible fields so the
+  // data subject receives everything that is processed about them.
+  async exportByClientId(clientId: string): Promise<Claim[]> {
+    return ClaimModel.findAllByClientId(clientId);
   },
 
   applyDecision(id: string, decision: 'approved' | 'rejected' | 'needs_info', note?: string, decidedBy?: string) {

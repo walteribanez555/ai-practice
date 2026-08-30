@@ -57,14 +57,20 @@ export interface Claim extends Record<string, unknown> {
   updatedAt:           string;
   processedAt?:        string;
   ttl?:                number;
+  // GDPR — Art. 13: timestamp when the claimant acknowledged the data processing notice
+  gdprConsentAt?:      string;
+  // GDPR — Art. 17: set when all personal data was anonymized on erasure request
+  gdprErasedAt?:       string;
 }
 
-export type CreateClaimInput = Pick<Claim, 'clientId'> & Partial<Pick<Claim, 'policyId'>>;
+export type CreateClaimInput = Pick<Claim, 'clientId'> & Partial<Pick<Claim, 'policyId' | 'gdprConsentAt'>>;
 
 export type UpdateClaimInput = Partial<
   Pick<
     Claim,
     | 'status'
+    | 'clientId'
+    | 'policyId'
     | 'claimType'
     | 'estimatedAmount'
     | 'incidentDate'
@@ -80,12 +86,15 @@ export type UpdateClaimInput = Partial<
     | 'updatedAt'
     | 'deletedAt'
     | 'documentAnalyses'
+    | 'documents'
     | 'adjusterNote'
     | 'decisionAt'
     | 'decidedBy'
     | 'crossDocConsistent'
     | 'crossDocObservations'
     | 'coverageClause'
+    | 'gdprConsentAt'
+    | 'gdprErasedAt'
   >
 >;
 
@@ -112,6 +121,15 @@ export const ClaimEntity = {
       pk: { name: 'clientId', value: clientId },
     });
     return all.filter(c => !c.deletedAt);
+  },
+
+  // Returns ALL claims including soft-deleted — used by GDPR erasure to ensure
+  // no record is missed, even those hidden from normal queries.
+  findAllByClientId(clientId: string): Promise<Claim[]> {
+    return table.queryIndex({
+      indexName: 'clientId-createdAt-index',
+      pk: { name: 'clientId', value: clientId },
+    });
   },
 
   findRecentByClientId(clientId: string, since: Date): Promise<Claim[]> {
@@ -146,9 +164,33 @@ export const ClaimEntity = {
       requiresHumanReview: false,
       createdAt:           now,
       updatedAt:           now,
-      ...(input.policyId ? { policyId: input.policyId } : {}),
+      ...(input.policyId      ? { policyId:      input.policyId      } : {}),
+      ...(input.gdprConsentAt ? { gdprConsentAt: input.gdprConsentAt } : {}),
     };
     return table.put(item);
+  },
+
+  // GDPR Art. 17 — anonymize all personal fields in a single claim.
+  // clientId is replaced with a sentinel so the record still exists for
+  // audit/actuarial purposes without containing identifiable data.
+  anonymize(id: string): Promise<Claim | null> {
+    return table.update(id, {
+      clientId:            'GDPR_ERASED',
+      policyId:            undefined,
+      documents:           [],
+      documentAnalyses:    [],
+      involvedParties:     undefined,
+      descriptionSummary:  undefined,
+      incidentDate:        undefined,
+      claimType:           undefined,
+      estimatedAmount:     undefined,
+      riskJustification:   undefined,
+      errorReason:         undefined,
+      adjusterNote:        undefined,
+      crossDocObservations: undefined,
+      gdprErasedAt:        new Date().toISOString(),
+      updatedAt:           new Date().toISOString(),
+    } as UpdateClaimInput);
   },
 
   async appendDocument(id: string, doc: DocumentRef): Promise<Claim | null> {

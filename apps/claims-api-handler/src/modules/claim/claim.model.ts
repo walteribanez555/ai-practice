@@ -13,4 +13,7 @@ export class ClaimModel {
   static update(id: string, input: UpdateClaimInput)         { return ClaimEntity.update(id, input); }
   static appendDocument(id: string, doc: import('../../orm/entities/claim.entity').DocumentRef) { return ClaimEntity.appendDocument(id, doc); }
   static softDelete(id: string)                              { return ClaimEntity.softDelete(id); }
+  // Returns ALL claims for a clientId including soft-deleted — needed for GDPR erasure
+  static findAllByClientId(clientId: string)                 { return ClaimEntity.findAllByClientId(clientId); }
+  static anonymize(id: string)                               { return ClaimEntity.anonymize(id); }
 }

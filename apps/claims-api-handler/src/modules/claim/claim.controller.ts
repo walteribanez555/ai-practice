@@ -205,4 +205,37 @@ export const ClaimController = {
     await ClaimService.softDelete(id);
     return c.body(null, 204);
   },
+
+  // ── DELETE /claims/gdpr/erase/:clientId — GDPR Art. 17, adjuster only ────
+  // Anonymizes all personal data for a clientId across DynamoDB and S3.
+  // The structural record is retained for audit/actuarial purposes.
+  async gdprErase(c: Context<AppEnv>) {
+    const clientId = c.req.param('clientId') ?? '';
+    if (!clientId) return c.json({ error: 'clientId is required.' }, 400);
+    const result = await ClaimService.eraseByClientId(clientId, s3);
+    logger.info('GDPR erasure completed', { clientId, erased: result.erased });
+    return c.json({ clientId, ...result, erasedAt: new Date().toISOString() });
+  },
+
+  // ── GET /claims/gdpr/export/:clientId — GDPR Art. 20, client or adjuster ──
+  // Returns all data processed for a clientId in portable JSON format.
+  // Clients can only export their own data; adjusters can export any.
+  async gdprExport(c: Context<AppEnv>) {
+    const role     = c.get('userRole');
+    const userId   = c.get('userId');
+    const clientId = c.req.param('clientId') ?? '';
+
+    if (role === 'client' && clientId !== userId) {
+      return c.json({ error: 'Forbidden.', code: 'ACCESS_DENIED' }, 403);
+    }
+
+    const claims = await ClaimService.exportByClientId(clientId);
+    return c.json({
+      exportedAt:  new Date().toISOString(),
+      clientId,
+      totalClaims: claims.length,
+      gdprNotice:  'This export contains all personal data processed for the specified data subject under GDPR Article 20 (Right to Data Portability).',
+      claims,
+    });
+  },
 };
