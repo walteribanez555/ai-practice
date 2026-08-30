@@ -19,8 +19,9 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
     return c.json({ error: 'Unauthorized.', code: 'INVALID_TOKEN' }, 401);
   }
 
-  c.set('userId',   payload.sub);
-  c.set('userRole', payload.role);
+  c.set('userId',    payload.sub);
+  c.set('userRole',  payload.role);
+  c.set('userEmail', payload.email);
 
   return next();
 });

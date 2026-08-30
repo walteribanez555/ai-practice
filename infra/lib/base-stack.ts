@@ -316,7 +316,8 @@ export class AssistanceStack extends cdk.Stack {
 
     // Bedrock: allow invoking any foundation model and cross-region inference profile.
     // ConverseCommand maps to bedrock:InvokeModel at the IAM level.
-    // Wildcard region required: cross-region inference profiles (us.*) route to other regions at runtime.
+    // RequestedRegion condition: cross-region inference for Nova Pro routes via us-east-1
+    // and us-west-2 only — this prevents accidental calls to other regions.
     processClaimRole.addToPolicy(new iam.PolicyStatement({
       sid:     "AllowBedrockInvoke",
       actions: ["bedrock:InvokeModel"],
@@ -324,6 +325,9 @@ export class AssistanceStack extends cdk.Stack {
         `arn:aws:bedrock:*::foundation-model/*`,
         `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
       ],
+      conditions: {
+        StringEquals: { "aws:RequestedRegion": ["us-east-1", "us-west-2"] },
+      },
     }));
 
     processClaimRole.addToPolicy(new iam.PolicyStatement({
@@ -526,6 +530,9 @@ export class AssistanceStack extends cdk.Stack {
         `arn:aws:bedrock:*::foundation-model/*`,
         `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
       ],
+      conditions: {
+        StringEquals: { "aws:RequestedRegion": ["us-east-1", "us-west-2"] },
+      },
     }));
 
     sfDocAnalysisRole.addToPolicy(new iam.PolicyStatement({
@@ -1490,6 +1497,116 @@ export class AssistanceStack extends cdk.Stack {
       value:       trail.trailArn,
       description: "CloudTrail ARN — query logs via CloudWatch Insights or Athena",
       exportName:  `${serviceName}-trail-arn`,
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // HIPAA — PHI Breach Detection
+    //
+    // Monitors the CloudTrail log stream for direct IAM user access to the
+    // documents bucket. Lambda-invoked access appears as AssumedRole; any
+    // IAMUser type indicates a human accessing claim documents directly from
+    // the console or CLI — the primary credential-theft breach vector.
+    //
+    // When the alarm fires, the privacy officer must:
+    //   1. Identify the IAM user from the CloudTrail event (userIdentity.arn)
+    //   2. Determine which objects were accessed (requestParameters.key)
+    //   3. Check if any accessed key has tag phi=true (indicates PHI breach)
+    //   4. If PHI: notify affected individuals within 60 days and report to HHS
+    //      under 45 CFR §164.408 (Breach Notification Rule)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const phiBreachTopic = new sns.Topic(this, "PhiBreachTopic", {
+      topicName:   `${serviceName}-phi-breach-alerts`,
+      displayName: "PHI Access Breach Alerts — subscribe privacy officer",
+    });
+
+    // MetricFilter: any S3 GetObject on the documents bucket from an IAMUser
+    // principal (not a Lambda execution role, which would appear as AssumedRole)
+    if (trail.logGroup) {
+      const phiBreachFilter = new logs.MetricFilter(this, "PhiDirectAccessFilter", {
+        logGroup:        trail.logGroup,
+        filterPattern:   logs.FilterPattern.all(
+          logs.FilterPattern.stringValue("$.eventSource",                          "=", "s3.amazonaws.com"),
+          logs.FilterPattern.stringValue("$.eventName",                            "=", "GetObject"),
+          logs.FilterPattern.stringValue("$.requestParameters.bucketName",         "=", documentsBucket.bucketName),
+          logs.FilterPattern.stringValue("$.userIdentity.type",                    "=", "IAMUser"),
+        ),
+        metricNamespace: "Assistance/PHI",
+        metricName:      "DirectDocumentAccess",
+        metricValue:     "1",
+        unit:            cloudwatch.Unit.COUNT,
+      });
+
+      const phiBreachAlarm = new cloudwatch.Alarm(this, "PhiBreachAlarm", {
+        alarmName:          `${serviceName}-phi-direct-access`,
+        alarmDescription:   "IAM user accessed claim documents directly — possible PHI breach. Check CloudTrail for userIdentity.arn and accessed keys.",
+        metric:             phiBreachFilter.metric({ statistic: "Sum", period: cdk.Duration.minutes(5) }),
+        threshold:          1,
+        evaluationPeriods:  1,
+        comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+        treatMissingData:   cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+      phiBreachAlarm.addAlarmAction(new cwActions.SnsAction(phiBreachTopic));
+    }
+
+    new cdk.CfnOutput(this, "PhiBreachTopicArn", {
+      value:       phiBreachTopic.topicArn,
+      description: "SNS topic for PHI breach alerts — subscribe privacy officer email here",
+      exportName:  `${serviceName}-phi-breach-topic-arn`,
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // HIPAA — Bedrock Model Invocation Logging Opt-Out
+    //
+    // AWS Bedrock does NOT use customer data for model training by default.
+    // This custom resource explicitly disables model invocation logging so
+    // that prompt contents (which may contain PHI) are never written to S3
+    // or CloudWatch by the Bedrock service itself.
+    //
+    // This configuration is intentional and auditable via CloudFormation state.
+    // If logging is needed for debugging, enable only to CloudWatch Logs
+    // (covered under the AWS BAA) — never to S3 without encryption controls.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    new cr.AwsCustomResource(this, "BedrockLoggingOptOut", {
+      resourceType: "Custom::BedrockLoggingOptOut",
+      onCreate: {
+        service:            "Bedrock",
+        action:             "putModelInvocationLoggingConfiguration",
+        parameters: {
+          loggingConfig: {
+            textDataDeliveryEnabled:      false,
+            imageDataDeliveryEnabled:     false,
+            embeddingDataDeliveryEnabled: false,
+          },
+        },
+        physicalResourceId: cr.PhysicalResourceId.of("bedrock-logging-opt-out"),
+        region:             this.region,
+      },
+      onUpdate: {
+        service:            "Bedrock",
+        action:             "putModelInvocationLoggingConfiguration",
+        parameters: {
+          loggingConfig: {
+            textDataDeliveryEnabled:      false,
+            imageDataDeliveryEnabled:     false,
+            embeddingDataDeliveryEnabled: false,
+          },
+        },
+        physicalResourceId: cr.PhysicalResourceId.of("bedrock-logging-opt-out"),
+        region:             this.region,
+      },
+      policy: cr.AwsCustomResourcePolicy.fromStatements([
+        new iam.PolicyStatement({
+          actions:   ["bedrock:PutModelInvocationLoggingConfiguration", "bedrock:GetModelInvocationLoggingConfiguration"],
+          resources: ["*"],
+        }),
+      ]),
+    });
+
+    new cdk.CfnOutput(this, "BedrockLoggingStatus", {
+      value:       "DISABLED — model invocation logging explicitly off via CDK custom resource",
+      description: "Bedrock model invocation logging status (HIPAA: PHI not written to S3/CW by Bedrock)",
     });
 
     new cdk.CfnOutput(this, "MlBucketName", {
