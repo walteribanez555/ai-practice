@@ -1620,6 +1620,10 @@ export class AssistanceStack extends cdk.Stack {
           actions:   ["bedrock:PutModelInvocationLoggingConfiguration", "bedrock:GetModelInvocationLoggingConfiguration"],
           resources: ["*"],
         }),
+        new iam.PolicyStatement({
+          actions:   ["iam:PassRole"],
+          resources: [bedrockLoggingRole.roleArn],
+        }),
       ]),
     });
 
