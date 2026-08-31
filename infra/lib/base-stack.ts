@@ -316,8 +316,9 @@ export class AssistanceStack extends cdk.Stack {
 
     // Bedrock: allow invoking any foundation model and cross-region inference profile.
     // ConverseCommand maps to bedrock:InvokeModel at the IAM level.
-    // RequestedRegion condition: cross-region inference for Nova Pro routes via us-east-1
-    // and us-west-2 only — this prevents accidental calls to other regions.
+    // No RequestedRegion condition: cross-region inference profiles (us.*) route
+    // dynamically to any US region (us-east-1, us-east-2, us-west-2) at runtime —
+    // adding a region condition breaks inference when AWS picks a non-listed region.
     processClaimRole.addToPolicy(new iam.PolicyStatement({
       sid:     "AllowBedrockInvoke",
       actions: ["bedrock:InvokeModel"],
@@ -325,9 +326,6 @@ export class AssistanceStack extends cdk.Stack {
         `arn:aws:bedrock:*::foundation-model/*`,
         `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
       ],
-      conditions: {
-        StringEquals: { "aws:RequestedRegion": ["us-east-1", "us-west-2"] },
-      },
     }));
 
     processClaimRole.addToPolicy(new iam.PolicyStatement({
@@ -530,9 +528,6 @@ export class AssistanceStack extends cdk.Stack {
         `arn:aws:bedrock:*::foundation-model/*`,
         `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
       ],
-      conditions: {
-        StringEquals: { "aws:RequestedRegion": ["us-east-1", "us-west-2"] },
-      },
     }));
 
     sfDocAnalysisRole.addToPolicy(new iam.PolicyStatement({
